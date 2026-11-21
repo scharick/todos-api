@@ -214,7 +214,11 @@ Los otros 4 puntos (`id` y `created_at` en cada tabla, FK en las relaciones, `UN
 - Front: formulario de login. Sin sesión, solo lectura. La credencial vive solo en memoria.
 - Pruebas: **50 pasan** (11 nuevas de seguridad). Navegador simulado: solo lectura sin login, contraseña incorrecta, login, CRUD, XSS y cerrar sesión. Pruebas de fuego locales con 5 comprobaciones nuevas de seguridad.
 
+**Resultados en producción** (Render + Vercel): pruebas de fuego **21 de 21** y navegador simulado sobre la página de Vercel con login: todo pasa.
+
 **Qué corregimos**
+- **Contraseña con un espacio al final en `.env`:** la de Render no lo tenía, así que el login con la del `.env` fallaba (7 pruebas de fuego en rojo). Se quitó el espacio. Lección: un espacio invisible cambia la contraseña.
+- La prueba del navegador suponía que siempre había 3 tareas y se trababa con una tarea real nuestra ("Presentacion Construccion"). Ahora cuenta las que hay al empezar.
 - En Spring Boot 4, `@WebMvcTest` no cargaba la seguridad con `spring-security-test`; hizo falta `spring-boot-starter-security-test`.
 - `jsdom` no trae `TextEncoder` (los navegadores sí); se agregó en la prueba, no en el front.
 
