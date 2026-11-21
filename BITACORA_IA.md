@@ -248,6 +248,24 @@ Los otros 4 puntos (`id` y `created_at` en cada tabla, FK en las relaciones, `UN
 - **H-22 (Baja):** la Data API de Supabase confirma que la tabla existe, pero niega leer, insertar y borrar (verificado).
 - La auditoría **no** corrió un escáner automático de dependencias; queda como recomendación.
 
+## Lab 14 — Pruebas de fuego cruzadas
+
+**Prompt del profesor:** "En parejas cruzadas: doble reserva al mismo tiempo y 'A intenta cancelar la reserva de B', sobre la URL pública".
+
+**Cómo lo adaptó la IA:** "doble reserva" → peticiones simultáneas sobre la misma tarea (10 `DELETE`, 10 `toggle`, 2 `POST`). "A cancela la reserva de B" → B, la otra pareja sin nuestra contraseña, intenta eliminar, editar o marcar una tarea de A. Script: `scripts/prueba-de-fuego-cruzada.sh`.
+
+**Qué encontró (fuga real):**
+
+| ID | Fuga | Riesgo | Cómo se cerró | Estado |
+|----|------|--------|---------------|--------|
+| F19 | 10 `DELETE` simultáneos daban **`2×500`**: el servicio leía y luego borraba (carrera entre leer y escribir). El `toggle` tenía la misma ventana | Errores `500` en producción y cambios perdidos con clics simultáneos | Borrado y `toggle` atómicos (una sentencia SQL); `PUT` contra una tarea borrada a la vez → `409` | Cerrada |
+
+**Resultados:** antes, 12/14 en producción. Después, 14/14 en local contra Supabase real y luego en producción. 53 pruebas automáticas (4 nuevas). Auditoría actualizada: H-29.
+
+**Qué corregimos de la IA:** su primera versión de la prueba 3 enviaba mal dos cuerpos en paralelo con `curl`; se usó `--next`.
+
+**Nota de diseño:** con un solo usuario no hay "tareas de B". El caso de A y B se reinterpretó como "alguien sin la contraseña"; queda documentado en el reporte de auditoría §7.
+
 ## Pendiente de revisar por nosotros
 
 - Confirmar con el profesor la arquitectura: Spring Boot en Render y un front pequeño en Vercel, en lugar de Next.js.

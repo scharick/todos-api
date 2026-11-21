@@ -12,8 +12,8 @@
 
 | Resultado | Cantidad |
 |-----------|----------|
-| Hallazgos totales | 28 |
-| Corregidos | 18 |
+| Hallazgos totales | 29 |
+| Corregidos | 19 |
 | Justificados (riesgo aceptado y explicado) | 10 |
 | Abiertos sin decisión | **0** |
 
@@ -56,6 +56,7 @@ Severidad: **Alta** = permite leer o modificar datos sin permiso, o exponer secr
 | H-15 | Baja | Rutas inexistentes o métodos no permitidos daban `500` | Manejadores `404`/`405`/`415` | Pruebas `ruta_inexistente…`, `metodo_no_soportado…` |
 | H-16 | Baja | `?completed=yes/1/on` se aceptaba como `true` | Solo `true` o `false` | Prueba `completed_solo_acepta_true_o_false` |
 | H-17 | Baja | CSP del front permitía cualquier `*.onrender.com` | `connect-src` solo para el backend propio | `frontend/index.html` |
+| H-29 | Media | **Concurrencia:** 10 `DELETE` simultáneos sobre la misma tarea daban `1×204 7×404 2×500`. El servicio leía y luego borraba, en dos pasos; lo mismo pasaba con el `toggle` | Borrado y `toggle` en **una sola sentencia** SQL (`borrarPorId`, `alternarCompleted`); `PUT` simultáneo con un borrado → `409` en vez de `500` | Producción: `1×204 9×404`; 10 toggles → estado final correcto (§7) |
 | H-18 | Baja | `/error` respondía con otro formato e incluía `path`; `WWW-Authenticate` abría la ventana del navegador | `ErrorPageController` y `AuthenticationEntryPoint` propios | Producción: `//toggle` → JSON del contrato; `401` sin `WWW-Authenticate` |
 
 ### 3.2 Justificados
@@ -135,3 +136,20 @@ Severidad: **Alta** = permite leer o modificar datos sin permiso, o exponer secr
 3. **Escáner de dependencias.** Agregar OWASP Dependency-Check o Dependabot al repositorio de GitHub.
 4. **Data API de Supabase (H-22).** Si nunca se va a usar, quitar `public` de los esquemas expuestos (*Settings → Data API*).
 5. **Rotar `APP_PASSWORD`** si se compartió por un canal inseguro.
+6. **Varios usuarios:** si se agregan, cada tarea necesita `user_id` y cada escritura debe comprobar que el usuario es el dueño (si no, `403`), además de políticas RLS por usuario.
+
+## 7. Pruebas de fuego cruzadas (concurrencia y "B ataca a A")
+
+Script: [scripts/prueba-de-fuego-cruzada.sh](../../scripts/prueba-de-fuego-cruzada.sh). A = nosotros (con contraseña); B = la otra pareja (sin contraseña).
+
+| Prueba | Antes de corregir | Después |
+|--------|-------------------|---------|
+| 10 `DELETE` simultáneos (equivale a la "doble reserva") | **`1×204 7×404 2×500`** | `1×204 9×404` |
+| 10 `toggle` simultáneos | `10×200`, estado correcto (por suerte: el código tenía la misma ventana de carrera) | `10×200`, estado correcto (atómico) |
+| 2 `POST` simultáneos con el mismo título | — | 2 tareas, `id` distintos |
+| B elimina, edita, marca o crea sin la contraseña | `401` | `401` |
+| B con una contraseña inventada u otro usuario | `401` | `401` |
+| B llama desde su propio sitio web | CORS `403` | CORS `403` |
+| La tarea de A después de los ataques | Sin cambios | Sin cambios |
+
+**"A cancela la reserva de B" en este MVP:** la app tiene **un solo usuario**, que es dueño de todas las tareas (modelo, "Dueño de la fila"). No existen "tareas de B" que A pueda tocar. El caso equivalente es que alguien sin la contraseña intente modificar las tareas, y eso falla con `401`. Si hubiera varios usuarios, haría falta una columna `user_id` y comprobar el dueño en cada escritura (recomendación 6).

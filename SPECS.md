@@ -182,6 +182,8 @@ app.security.password=${APP_PASSWORD:}
 
 Variables en Render (nunca en el repo): `DB_URL`, `DB_USER`, `DB_PASSWORD`, `APP_USER`, `APP_PASSWORD` y `CORS_ORIGINS=https://todos-api-frontend.vercel.app,http://localhost:5173`.
 
+Pruebas de fuego cruzadas (concurrencia y "B ataca a A"): `bash scripts/prueba-de-fuego-cruzada.sh https://todos-api-hoal.onrender.com`.
+
 Pruebas de fuego: `bash scripts/prueba-de-fuego.sh https://todos-api-hoal.onrender.com https://todos-api-frontend.vercel.app`.
 
 > En el plan gratuito de Render el servicio "se duerme" tras un rato sin uso; la primera petición puede tardar ~30–60 s.
@@ -255,3 +257,11 @@ Formato Dado / Cuando / Entonces. Cada operación tiene al menos un caso de erro
 - **CA-7.2 (error)** Dado que no inicié sesión, cuando hago `GET /api/auth/me`, entonces recibo `401`.
 - **CA-S.4 (error)** Dado que faltan `APP_USER` o `APP_PASSWORD`, o que la contraseña tiene menos de 12 caracteres, cuando arranca la app, entonces la app no arranca.
 - **CA-S.5 (error)** Dado que no inicié sesión, cuando llamo a una ruta que no está en el contrato, entonces recibo `401` (cerrado por defecto).
+
+### Concurrencia y ataques cruzados (pruebas de fuego del profesor)
+
+- **CA-C.1 (error)** Dada una tarea, cuando llegan 10 `DELETE` simultáneos, entonces exactamente uno recibe `204` y los otros 9 reciben `404`; ninguno recibe `500`.
+- **CA-C.2** Dada una tarea con `completed=false`, cuando llegan 10 `PATCH /toggle` simultáneos, entonces los 10 reciben `200` y la tarea termina en `false` (no se pierde ningún cambio).
+- **CA-C.3** Cuando llegan dos `POST` simultáneos con el mismo título, entonces se crean dos tareas con `id` distinto.
+- **CA-C.4 (error)** Dado un `PUT` y un `DELETE` simultáneos sobre la misma tarea, cuando el borrado gana, entonces el `PUT` recibe `404` o `409`, nunca `500`.
+- **CA-X.1 (error)** Dada una tarea creada por A, cuando B (sin la contraseña) intenta eliminarla, editarla o marcarla, entonces recibe `401` y la tarea no cambia.

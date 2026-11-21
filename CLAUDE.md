@@ -10,7 +10,7 @@ MVP académico: API REST de tareas (CRUD) con un front pequeño que la consume.
 | Base de datos | PostgreSQL en Supabase | Supabase |
 | Front (`frontend/`) | HTML, CSS y JS | Vercel: https://todos-api-frontend.vercel.app |
 
-Después de desplegar, corre `bash scripts/prueba-de-fuego.sh <url-render> <url-vercel>`; todas deben pasar.
+Después de desplegar, corre `bash scripts/prueba-de-fuego.sh <url-render> <url-vercel>` y `bash scripts/prueba-de-fuego-cruzada.sh <url-render>` (con `APP_USER`/`APP_PASSWORD` en el entorno); todas deben pasar. Toda escritura nueva debe ser atómica o manejar la concurrencia (ver F19).
 
 ## Fuentes de verdad (léelas antes de cambiar algo)
 

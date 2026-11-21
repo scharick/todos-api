@@ -51,7 +51,7 @@ Basado en [SPECS.md](../../SPECS.md) y en el modelo aprobado [docs/datos/modelo.
 | `400` Bad Request | Sí | Datos de entrada inválidos |
 | `401` Unauthorized | Sí | Escrituras sin credenciales o con credenciales incorrectas (Op. 3 a 7) |
 | `404` Not Found | Sí | La tarea no existe o ya fue borrada |
-| `409` Conflict | **No** | No hay reglas de unicidad aparte del `id` (se permiten títulos repetidos) ni estados que choquen: se puede editar una tarea completada |
+| `409` Conflict | Sí, solo en `PUT` | Otra petición borró la tarea mientras se editaba. No hay conflictos de unicidad: se permiten títulos repetidos |
 | `500` Internal Server Error | Sí (todas) | Error inesperado. Mensaje: `Error interno del servidor` |
 
 ### Autenticación (Spring Security)
@@ -251,6 +251,7 @@ Reemplazo completo: los campos que no se envían toman su valor por defecto (`de
 | `400` | `title` tiene más de 100 caracteres después del recorte | `El título no puede superar 100 caracteres` |
 | `400` | `description` tiene más de 500 caracteres | `La descripción no puede superar 500 caracteres` |
 | `404` | No existe una tarea con ese id | `Todo con id {id} no existe` |
+| `409` | Otra petición borró o cambió la tarea mientras se editaba (peticiones simultáneas) | `La tarea cambió o fue eliminada por otra petición al mismo tiempo. Vuelve a cargarla e inténtalo de nuevo` |
 | `401` | No se envió `Authorization` | `Debes iniciar sesión para hacer esto` |
 | `401` | Usuario o contraseña incorrectos | `Usuario o contraseña incorrectos` |
 | `500` | Error inesperado | `Error interno del servidor` |
@@ -263,7 +264,7 @@ Orden de las comprobaciones: primero el id (`400`), luego el cuerpo (`400`) y al
 
 **`PATCH /api/todos/{id}/toggle`** · Quién: usuario autenticado (HTTP Basic)
 
-Invierte `completed`: `false` → `true` y `true` → `false`. No cambia ningún otro campo.
+Invierte `completed`: `false` → `true` y `true` → `false`. No cambia ningún otro campo. Es **atómico**: N peticiones simultáneas aplican los N cambios.
 
 **Entrada**
 
@@ -300,7 +301,7 @@ Invierte `completed`: `false` → `true` y `true` → `false`. No cambia ningún
 
 **`DELETE /api/todos/{id}`** · Quién: usuario autenticado (HTTP Basic)
 
-Borrado físico: la tarea deja de existir (modelo, pregunta 6).
+Borrado físico: la tarea deja de existir (modelo, pregunta 6). Es **atómico**: si llegan varias peticiones a la vez, solo una recibe `204` y las demás `404`.
 
 **Entrada**
 
