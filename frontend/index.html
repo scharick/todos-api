@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' http://localhost:8080 https://*.onrender.com; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+  <title>Mis tareas</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app">
+    <header class="app__header">
+      <h1>Mis tareas</h1>
+      <p class="app__subtitle">Lista compartida · datos en Supabase</p>
+    </header>
+
+    <form id="form-crear" class="card form" novalidate>
+      <label class="field">
+        <span class="field__label">Título</span>
+        <input id="crear-title" name="title" type="text" maxlength="100" autocomplete="off"
+               placeholder="¿Qué hay que hacer?" required>
+      </label>
+      <label class="field">
+        <span class="field__label">Descripción <span class="field__hint">(opcional)</span></span>
+        <textarea id="crear-description" name="description" maxlength="500" rows="2"
+                  placeholder="Detalles"></textarea>
+      </label>
+      <button type="submit" class="btn btn--primary">Agregar tarea</button>
+    </form>
+
+    <nav class="filters" aria-label="Filtrar tareas">
+      <button type="button" class="filter is-active" data-filter="">Todas</button>
+      <button type="button" class="filter" data-filter="false">Pendientes</button>
+      <button type="button" class="filter" data-filter="true">Completadas</button>
+    </nav>
+
+    <p id="estado" class="status" role="status" aria-live="polite"></p>
+
+    <ul id="lista" class="list"></ul>
+    <p id="vacio" class="empty" hidden>No hay tareas aquí.</p>
+  </main>
+
+  <template id="tpl-tarea">
+    <li class="card todo">
+      <div class="todo__view">
+        <input type="checkbox" class="todo__check" aria-label="Marcar como completada">
+        <div class="todo__body">
+          <p class="todo__title"></p>
+          <p class="todo__description"></p>
+          <p class="todo__date"></p>
+        </div>
+        <div class="todo__actions">
+          <button type="button" class="btn btn--ghost" data-action="editar">Editar</button>
+          <button type="button" class="btn btn--danger" data-action="eliminar">Eliminar</button>
+        </div>
+      </div>
+      <form class="todo__edit form" hidden novalidate>
+        <label class="field">
+          <span class="field__label">Título</span>
+          <input name="title" type="text" maxlength="100" required>
+        </label>
+        <label class="field">
+          <span class="field__label">Descripción</span>
+          <textarea name="description" maxlength="500" rows="2"></textarea>
+        </label>
+        <label class="check">
+          <input name="completed" type="checkbox"> Completada
+        </label>
+        <div class="todo__actions">
+          <button type="submit" class="btn btn--primary">Guardar</button>
+          <button type="button" class="btn btn--ghost" data-action="cancelar">Cancelar</button>
+        </div>
+      </form>
+    </li>
+  </template>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
