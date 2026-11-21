@@ -46,17 +46,21 @@ public class TodoService {
         return TodoResponse.from(repository.saveAndFlush(todo));
     }
 
+    /** Atómico: no lee y luego escribe, así que toggles simultáneos no se pisan. */
     @Transactional
     public TodoResponse toggle(long id) {
-        Todo todo = find(id);
-        todo.setCompleted(!todo.isCompleted());
-        return TodoResponse.from(repository.saveAndFlush(todo));
+        if (repository.alternarCompleted(id) == 0) {
+            throw new TodoNotFoundException(id);
+        }
+        return TodoResponse.from(find(id));
     }
 
-    /** Borrado físico; borrar dos veces da 404 (regla 9). */
+    /** Borrado físico y atómico; borrar dos veces (o a la vez) da 404 (regla 9). */
     @Transactional
     public void delete(long id) {
-        repository.delete(find(id));
+        if (repository.borrarPorId(id) == 0) {
+            throw new TodoNotFoundException(id);
+        }
     }
 
     private Todo find(long id) {

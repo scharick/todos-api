@@ -326,6 +326,20 @@ class TodoControllerTest {
     }
 
     @Test
+    void edicion_simultanea_con_un_borrado_responde_409_y_no_500() throws Exception {
+        when(service.update(eq(1L), any()))
+                .thenThrow(new org.springframework.orm.ObjectOptimisticLockingFailureException(
+                        edu.usta.todos.model.Todo.class, 1L));
+
+        mvc.perform(json(put("/api/todos/1"), "{\"title\": \"Nuevo\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.message").value(
+                        "La tarea cambió o fue eliminada por otra petición al mismo tiempo. Vuelve a cargarla e inténtalo de nuevo"))
+                .andExpect(content().string(not(containsString("edu.usta"))));
+    }
+
+    @Test
     void ca_4_3_error_editar_tarea_inexistente() throws Exception {
         when(service.update(eq(99L), any())).thenThrow(new TodoNotFoundException(99));
 

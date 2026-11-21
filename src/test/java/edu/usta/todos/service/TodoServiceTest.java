@@ -83,23 +83,42 @@ class TodoServiceTest {
     }
 
     @Test
-    void toggle_invierte_completed_en_ambos_sentidos() {
-        Todo todo = tarea("Estudiar", false);
-        when(repository.findById(1L)).thenReturn(Optional.of(todo));
-        when(repository.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
+    void toggle_es_una_sola_sentencia_atomica_y_devuelve_el_estado_nuevo() {
+        when(repository.alternarCompleted(1L)).thenReturn(1);
+        when(repository.findById(1L)).thenReturn(Optional.of(tarea("Estudiar", true)));
 
         assertThat(service.toggle(1L).completed()).isTrue();
-        assertThat(service.toggle(1L).completed()).isFalse();
+        verify(repository).alternarCompleted(1L);
+        verify(repository, never()).saveAndFlush(any());
     }
 
     @Test
-    void delete_de_tarea_inexistente_lanza_404() {
-        when(repository.findById(3L)).thenReturn(Optional.empty());
+    void toggle_de_tarea_inexistente_lanza_404() {
+        when(repository.alternarCompleted(99L)).thenReturn(0);
+
+        assertThatThrownBy(() -> service.toggle(99L))
+                .isInstanceOf(TodoNotFoundException.class)
+                .hasMessage("Todo con id 99 no existe");
+    }
+
+    @Test
+    void delete_es_atomico_y_borra_una_sola_vez() {
+        when(repository.borrarPorId(3L)).thenReturn(1);
+
+        service.delete(3L);
+
+        verify(repository).borrarPorId(3L);
+        verify(repository, never()).delete(any());
+    }
+
+    @Test
+    void delete_que_no_borra_nada_lanza_404_aunque_sea_simultaneo() {
+        // Con 10 DELETE a la vez, solo uno obtiene 1 fila; los demás obtienen 0
+        when(repository.borrarPorId(3L)).thenReturn(0);
 
         assertThatThrownBy(() -> service.delete(3L))
                 .isInstanceOf(TodoNotFoundException.class)
                 .hasMessage("Todo con id 3 no existe");
-        verify(repository, never()).delete(any());
     }
 
     @Test

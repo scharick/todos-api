@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -50,6 +51,16 @@ public class GlobalExceptionHandler {
                 .distinct()
                 .collect(Collectors.joining("; "));
         return respond(HttpStatus.BAD_REQUEST, message);
+    }
+
+    /**
+     * Otra petición borró o cambió la tarea mientras esta la editaba (ej. PUT y DELETE a la vez).
+     * Sin este manejador terminaba en 500.
+     */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    ResponseEntity<ErrorResponse> conflict(OptimisticLockingFailureException e) {
+        return respond(HttpStatus.CONFLICT,
+                "La tarea cambió o fue eliminada por otra petición al mismo tiempo. Vuelve a cargarla e inténtalo de nuevo");
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
