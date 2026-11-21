@@ -122,3 +122,26 @@ input:focus-visible, textarea:focus-visible, button:focus-visible {
   .todo__view { flex-wrap: wrap; }
   .todo__actions { width: 100%; justify-content: flex-end; }
 }
+
+/* ---------- Sesión ---------- */
+.sesion { margin-bottom: 16px; }
+.sesion__texto { margin: 0 0 12px; color: var(--muted); font-size: .9rem; }
+.sesion__campos { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: end; }
+.sesion__activa { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+input[type="password"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+#form-crear { margin-bottom: 0; }
+
+/* Sin sesión: solo lectura */
+body:not([data-sesion]) .requiere-login { display: none; }
+
+@media (max-width: 480px) {
+  .sesion__campos { grid-template-columns: 1fr; }
+}

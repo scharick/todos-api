@@ -1,8 +1,10 @@
 // Front de la API de tareas. Consume las operaciones de docs/contratos/api.md.
 // Seguridad: los datos del servidor se pintan solo con textContent (nunca innerHTML).
+// La sesión (HTTP Basic) vive solo en memoria: se pierde al recargar y nunca va a localStorage.
 "use strict";
 
-const API = `${window.TODOS_CONFIG.apiUrl}/api/todos`;
+const BASE = window.TODOS_CONFIG.apiUrl;
+const API = `${BASE}/api/todos`;
 
 const $lista = document.getElementById("lista");
 const $vacio = document.getElementById("vacio");
@@ -14,33 +16,62 @@ const fechaFormato = new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", tim
 const campo = (form, nombre) => form.elements.namedItem(nombre);
 
 let filtro = ""; // "", "true" o "false"
+let credenciales = null; // "usuario:contraseña" en Base64, solo en memoria
 
 // ---------- Llamadas a la API ----------
 
-async function api(path = "", options = {}) {
+const base64 = (texto) => btoa(String.fromCharCode(...new TextEncoder().encode(texto)));
+
+/** Las lecturas son públicas; las escrituras (auth: true) envían Authorization. */
+async function api(url, options = {}, { auth = false } = {}) {
+  const headers = {};
+  if (options.body) headers["Content-Type"] = "application/json";
+  if (auth && credenciales) headers.Authorization = `Basic ${credenciales}`;
+
   let res;
   try {
-    res = await fetch(API + path, {
-      ...options,
-      headers: options.body ? { "Content-Type": "application/json" } : undefined,
-    });
+    res = await fetch(url, { ...options, headers });
   } catch {
     throw new Error("No se pudo conectar con el servidor. Intenta de nuevo en unos segundos.");
   }
   if (res.status === 204) return null;
   const data = await res.json().catch(() => null);
   if (!res.ok) {
+    if (res.status === 401) cerrarSesion();
     // El backend siempre responde { status, error, message, timestamp }
     throw new Error(data?.message ?? "Error inesperado");
   }
   return data;
 }
 
-const listar = () => api(filtro === "" ? "" : `?completed=${filtro}`);
-const crear = (tarea) => api("", { method: "POST", body: JSON.stringify(tarea) });
-const editar = (id, tarea) => api(`/${id}`, { method: "PUT", body: JSON.stringify(tarea) });
-const alternar = (id) => api(`/${id}/toggle`, { method: "PATCH" });
-const eliminar = (id) => api(`/${id}`, { method: "DELETE" });
+const escribir = (path, options) => api(API + path, options, { auth: true });
+
+const listar = () => api(API + (filtro === "" ? "" : `?completed=${filtro}`));
+const crear = (tarea) => escribir("", { method: "POST", body: JSON.stringify(tarea) });
+const editar = (id, tarea) => escribir(`/${id}`, { method: "PUT", body: JSON.stringify(tarea) });
+const alternar = (id) => escribir(`/${id}/toggle`, { method: "PATCH" });
+const eliminar = (id) => escribir(`/${id}`, { method: "DELETE" });
+const quienSoy = () => api(`${BASE}/api/auth/me`, {}, { auth: true });
+
+// ---------- Sesión ----------
+
+const $formLogin = document.getElementById("form-login");
+const $sesionActiva = document.getElementById("sesion-activa");
+
+function actualizarSesion(usuario = null) {
+  const activa = Boolean(credenciales && usuario);
+  if (activa) document.body.dataset.sesion = "si";
+  else delete document.body.dataset.sesion;
+  $formLogin.hidden = activa;
+  $sesionActiva.hidden = !activa;
+  document.getElementById("usuario-actual").textContent = activa ? usuario : "";
+  $lista.querySelectorAll(".todo__check").forEach((c) => { c.disabled = !activa; });
+}
+
+function cerrarSesion() {
+  credenciales = null;
+  actualizarSesion();
+}
 
 // ---------- Interfaz ----------
 
@@ -56,6 +87,7 @@ function pintarTarea(tarea) {
 
   const check = li.querySelector(".todo__check");
   check.checked = tarea.completed;
+  check.disabled = !credenciales;
   li.querySelector(".todo__title").textContent = tarea.title;
   const desc = li.querySelector(".todo__description");
   desc.textContent = tarea.description ?? "";
@@ -124,6 +156,31 @@ async function ejecutar(operacion, mensajeOk) {
 }
 
 // ---------- Eventos ----------
+
+$formLogin.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const usuario = campo($formLogin, "usuario").value.trim();
+  const password = campo($formLogin, "password").value;
+  if (!usuario || !password) {
+    mostrarEstado("Escribe tu usuario y tu contraseña", "error");
+    return;
+  }
+  credenciales = base64(`${usuario}:${password}`);
+  try {
+    const sesion = await quienSoy();
+    actualizarSesion(sesion.username);
+    $formLogin.reset();
+    mostrarEstado(`Hola, ${sesion.username}`, "ok");
+  } catch (err) {
+    cerrarSesion();
+    mostrarEstado(err.message, "error");
+  }
+});
+
+document.getElementById("btn-salir").addEventListener("click", () => {
+  cerrarSesion();
+  mostrarEstado("Sesión cerrada", "ok");
+});
 
 $formCrear.addEventListener("submit", async (e) => {
   e.preventDefault();

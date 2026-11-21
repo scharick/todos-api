@@ -15,7 +15,28 @@
       <p class="app__subtitle">Lista compartida · datos en Supabase</p>
     </header>
 
-    <form id="form-crear" class="card form" novalidate>
+    <section class="card sesion" aria-label="Sesión">
+      <form id="form-login" class="sesion__login" novalidate>
+        <p class="sesion__texto">Cualquiera puede ver la lista. Inicia sesión para crear, editar o eliminar.</p>
+        <div class="sesion__campos">
+          <label class="field">
+            <span class="field__label">Usuario</span>
+            <input name="usuario" type="text" autocomplete="username" required>
+          </label>
+          <label class="field">
+            <span class="field__label">Contraseña</span>
+            <input name="password" type="password" autocomplete="current-password" required>
+          </label>
+          <button type="submit" class="btn btn--primary">Iniciar sesión</button>
+        </div>
+      </form>
+      <div id="sesion-activa" class="sesion__activa" hidden>
+        <span>Sesión iniciada como <strong id="usuario-actual"></strong></span>
+        <button type="button" id="btn-salir" class="btn btn--ghost">Cerrar sesión</button>
+      </div>
+    </section>
+
+    <form id="form-crear" class="card form requiere-login" novalidate>
       <label class="field">
         <span class="field__label">Título</span>
         <input id="crear-title" name="title" type="text" maxlength="100" autocomplete="off"
@@ -50,7 +71,7 @@
           <p class="todo__description"></p>
           <p class="todo__date"></p>
         </div>
-        <div class="todo__actions">
+        <div class="todo__actions requiere-login">
           <button type="button" class="btn btn--ghost" data-action="editar">Editar</button>
           <button type="button" class="btn btn--danger" data-action="eliminar">Eliminar</button>
         </div>
