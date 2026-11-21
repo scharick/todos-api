@@ -86,3 +86,33 @@ El modelo está implementado en PostgreSQL de Supabase con la migración [supaba
 - Reglas 3, 4 y 7 → `id` `GENERATED ALWAYS AS IDENTITY`: la BD rechaza un id enviado y cualquier cambio del id.
 - Reglas 4 y 5 → trigger `todos_proteger_created_at`: rechaza fechas futuras y cambios de `created_at`.
 - Dueño de la fila → RLS activado sin políticas y sin permisos para `anon` y `authenticated`. Solo el backend (dueño de la tabla) puede leer y escribir.
+
+## 7. Reglas de negocio por capa
+
+Cada regla tiene una **capa principal**, que la rechaza y le da al usuario el mensaje del [contrato](../contratos/api.md), y una **capa de respaldo**, que la bloquea aunque la capa principal falle o alguien escriba directo en la BD.
+
+Capas:
+- **API**: `TodoController`, DTO `TodoRequest` y `GlobalExceptionHandler`.
+- **Backend**: `TodoService` y la entidad JPA `Todo`.
+- **BD**: PostgreSQL en Supabase, mediante la migración.
+
+| Regla (SPECS §3) | Capa principal | Cómo | Capa de respaldo | Cómo |
+|------------------|----------------|------|------------------|------|
+| 1. Título obligatorio, sin solo espacios | Backend | Recorta el título y lo valida (`@NotBlank`) → `400 El título es obligatorio` | BD | `NOT NULL`, `todos_title_no_vacio`, `todos_title_recortado` |
+| 2. Título ≤ 100, descripción ≤ 500 | API | `@Size` en `TodoRequest` → `400` con el mensaje del contrato | BD | `VARCHAR(100)` y `VARCHAR(500)` |
+| 3. No hay dos tareas con el mismo `id` | BD | `PRIMARY KEY` | — | — |
+| 4. El cliente no elige `id` ni `createdAt` | API | `TodoRequest` no tiene esos campos; si llegan, se ignoran | BD | `id` `GENERATED ALWAYS`; trigger contra fechas futuras |
+| 5. `createdAt` no cambia y no es futura | Backend | La asigna con la hora actual al crear (`@PrePersist`) y la columna es `updatable = false` | BD | Trigger `todos_proteger_created_at` |
+| 6. `completed` nunca es `null` | Backend | Vale `false` si no se envía | BD | `NOT NULL DEFAULT false` |
+| 7. `PUT`/`PATCH` no cambian el `id` | Backend | Usa el id de la ruta, nunca el del cuerpo | BD | `GENERATED ALWAYS` rechaza el `UPDATE` del id |
+| 8. No se guarda nada a medias | Backend | Valida todo antes de guardar; `@Transactional` por operación | BD | Cada sentencia es atómica |
+| 9. Tarea inexistente → `404` | Backend | `TodoService` lanza `TodoNotFoundException` | API | `GlobalExceptionHandler` → `404 Todo con id {id} no existe` |
+| 10. Los errores no muestran detalles internos | API | `GlobalExceptionHandler` traduce toda excepción, incluidas las de Postgres, a los mensajes del contrato; `500 Error interno del servidor` para lo inesperado | — | — |
+
+| Decisión (SPECS §3) | Capa | Cómo |
+|---------------------|------|------|
+| Se permiten títulos repetidos | BD | No hay `UNIQUE` en `title` |
+| Se puede editar una tarea completada | Backend | `TodoService` no revisa `completed` antes de editar |
+| Borrar dos veces → `404` | Backend | Igual que la regla 9 (borrado físico) |
+| Descripción vacía → `NULL` | Backend | La normaliza antes de guardar; respaldo en la BD: `todos_description_no_vacia` |
+| Dueño de la fila: la aplicación | BD | RLS activo sin políticas y sin permisos para `anon`/`authenticated` |
