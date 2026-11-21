@@ -201,6 +201,35 @@ Los otros 4 puntos (`id` y `created_at` en cada tabla, FK en las relaciones, `UN
 | — | El rechazo de CORS responde `403 Invalid CORS request` en texto plano, no en el formato JSON del contrato | Ninguno: no expone detalles internos | Justificada: lo responde Spring antes del controlador y solo lo ven orígenes no permitidos | Justificada |
 | — | Render gratis se duerme y la primera petición tarda ~1 min | Disponibilidad, no seguridad | Justificada: el front muestra "Cargando…"; es el plan gratuito | Justificada |
 
+## Lab 12 — Spring Security
+
+**Prompt:** "necesito que tenga un Spring Security".
+
+**Qué preguntó la IA y qué decidimos:** había tres opciones: (1) login con un solo usuario, (2) Spring Security sin login (solo endurecer) o (3) usuarios reales con Supabase Auth. Elegimos la **(1)**: leer es público y escribir exige HTTP Basic, con un usuario que sale de `APP_USER`/`APP_PASSWORD`.
+
+**Qué hizo la IA**
+- `SecurityConfig`: `GET` de tareas es público y todo lo demás exige login (cerrado por defecto). Sin sesión ni cookies (`STATELESS`), contraseña con BCrypt, `401` en el formato del contrato y sin `WWW-Authenticate`, y CORS dentro de Spring Security, con la cabecera `Authorization` permitida.
+- La app **no arranca** si faltan `APP_USER`/`APP_PASSWORD` o si la contraseña tiene menos de 12 caracteres.
+- Op. 7 `GET /api/auth/me` para que el front compruebe el login. Se actualizaron el contrato (401 en las operaciones 3 a 7), SPECS (criterios CA-S y CA-7) y la skill.
+- Front: formulario de login. Sin sesión, solo lectura. La credencial vive solo en memoria.
+- Pruebas: **50 pasan** (11 nuevas de seguridad). Navegador simulado: solo lectura sin login, contraseña incorrecta, login, CRUD, XSS y cerrar sesión. Pruebas de fuego locales con 5 comprobaciones nuevas de seguridad.
+
+**Qué corregimos**
+- En Spring Boot 4, `@WebMvcTest` no cargaba la seguridad con `spring-security-test`; hizo falta `spring-boot-starter-security-test`.
+- `jsdom` no trae `TextEncoder` (los navegadores sí); se agregó en la prueba, no en el front.
+
+**Fugas**
+
+| ID | Fuga | Riesgo | Cómo se cerró | Estado |
+|----|------|--------|---------------|--------|
+| F14 | Spring Security sin configurar crea un usuario `user` con una contraseña aleatoria que imprime en el log | La contraseña de producción quedaría en los logs de Render | Bean `UserDetailsService` propio: Spring no genera contraseña | Cerrada |
+| F15 | HTTP Basic por defecto envía `WWW-Authenticate: Basic` | El navegador abre su ventana de login nativa, saltándose el front | `AuthenticationEntryPoint` propio sin esa cabecera | Cerrada |
+| F16 | Un usuario o contraseña por defecto (`admin`/`admin`) "para que arranque" | Cualquiera podría escribir en producción | Sin valor por defecto; sin variables o con menos de 12 caracteres, la app no arranca (`SecurityConfigTest`) | Cerrada |
+| F17 | `/error` de Spring respondía con otro formato e incluía `path` (visto con `PATCH /api/todos//toggle`) | Rompía la regla 10 y el formato del contrato | `ErrorPageController` con el formato del contrato y sin `path` | Cerrada |
+| F18 | Guardar la credencial en `localStorage` | Cualquier XSS la robaría para siempre | Solo en memoria; se pierde al recargar | Cerrada |
+| — | CSRF desactivado | Ninguno mientras no haya cookies | Justificada: la credencial viaja en la cabecera `Authorization`, que un sitio ajeno no puede enviar | Justificada |
+| — | HTTP Basic no limita los intentos de login | Fuerza bruta contra la contraseña | Justificada para el MVP: contraseña de 12+ caracteres, BCrypt (lento) y HTTPS. Mejora futura: limitar intentos | Justificada |
+
 ## Pendiente de revisar por nosotros
 
 - Confirmar con el profesor la arquitectura: Spring Boot en Render y un front pequeño en Vercel, en lugar de Next.js.

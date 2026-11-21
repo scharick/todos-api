@@ -9,13 +9,22 @@ Aplica cada punto que toque el cambio. Si un punto no se cumple, corrígelo o ju
 
 ## 1. Secretos y configuración
 
-- [ ] No hay contraseñas, URLs de BD, llaves de Supabase ni tokens en el código, en `application.properties` ni en git. Solo variables de entorno (`DB_URL`, `DB_USER`, `DB_PASSWORD`, `CORS_ORIGINS`).
+- [ ] No hay contraseñas, URLs de BD, llaves de Supabase ni tokens en el código, en `application.properties` ni en git. Solo variables de entorno (`DB_URL`, `DB_USER`, `DB_PASSWORD`, `CORS_ORIGINS`, `APP_USER`, `APP_PASSWORD`).
 - [ ] `.env` y archivos con credenciales están en `.gitignore`.
 - [ ] La llave `service_role` de Supabase nunca se usa ni se envía al front.
 - [ ] No hay consolas ni herramientas de depuración abiertas en producción (consola H2, `devtools`, Actuator con endpoints sensibles).
 - [ ] `spring.jpa.hibernate.ddl-auto=validate`: Hibernate nunca cambia el esquema.
 
-## 2. Entrada
+## 2. Autenticación (Spring Security)
+
+- [ ] Las escrituras exigen login; leer es lo único público. `anyRequest().authenticated()`: cerrado por defecto.
+- [ ] No hay usuario ni contraseña por defecto; sin `APP_USER`/`APP_PASSWORD` la app no arranca.
+- [ ] Las contraseñas se guardan con BCrypt, nunca en texto plano en memoria ni en logs.
+- [ ] El `401` usa el formato del contrato y no envía `WWW-Authenticate`.
+- [ ] CSRF desactivado solo porque no hay cookies ni sesión (`STATELESS`); si algún día hay cookies, se reactiva.
+- [ ] El front guarda la credencial solo en memoria (nunca `localStorage`).
+
+## 2b. Entrada
 
 - [ ] Todo dato del cliente pasa por un DTO con Bean Validation (`@NotBlank`, `@Size`…). Nunca se enlaza el JSON directo a la entidad JPA.
 - [ ] El DTO no tiene `id` ni `createdAt`: el cliente no puede asignarlos (protección contra *mass assignment*).

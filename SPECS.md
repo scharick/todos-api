@@ -12,6 +12,7 @@ Construir un backend REST sencillo para gestionar una lista de tareas (CRUD) y d
 | Framework       | Spring Boot 4.1.1 (Spring Web MVC)         |
 | Persistencia    | Spring Data JPA + PostgreSQL en Supabase   |
 | Validación      | Jakarta Bean Validation (`spring-boot-starter-validation`) |
+| Seguridad       | Spring Security: HTTP Basic, un usuario desde variables de entorno |
 | Utilidades      | Lombok                                     |
 | Build           | Maven (wrapper `mvnw`)                     |
 | Despliegue back | Docker + Render (plan gratuito)            |
@@ -62,6 +63,7 @@ Ejemplo JSON:
 - Se puede editar una tarea ya completada.
 - Borrar una tarea que ya fue borrada devuelve `404` (regla 9).
 - Se quitan los espacios al inicio y al final del título antes de validarlo (regla 1).
+- Leer es público; crear, editar, marcar y eliminar exigen iniciar sesión (Spring Security, HTTP Basic). Hay un solo usuario, definido con `APP_USER` y `APP_PASSWORD`; sin ellos la app no arranca.
 
 ## 4. Endpoints
 
@@ -154,9 +156,12 @@ spring.datasource.url=${DB_URL}
 spring.datasource.username=${DB_USER}
 spring.datasource.password=${DB_PASSWORD}
 spring.jpa.hibernate.ddl-auto=validate
+app.security.user=${APP_USER:}
+app.security.password=${APP_PASSWORD:}
 ```
 
 - `server.port=${PORT:8080}` permite que Render asigne el puerto en producción y que localmente se use el 8080.
+- `APP_USER` y `APP_PASSWORD` (mínimo 12 caracteres) definen el usuario que puede escribir. No tienen valor por defecto: si faltan, la app no arranca.
 - Los datos de conexión salen de variables de entorno (en Render y en el equipo local) y **nunca** se suben al repositorio.
 - `ddl-auto=validate`: Hibernate solo comprueba que las entidades coincidan con la tabla; no la crea ni la modifica, porque de eso se encargan las migraciones.
 - El backend se conecta como dueño de la tabla, por eso no le afecta RLS (ver [supabase/migrations/](supabase/migrations/)).
@@ -175,7 +180,7 @@ spring.jpa.hibernate.ddl-auto=validate
 | Backend | https://todos-api-hoal.onrender.com/api/todos | Render, Blueprint `render.yaml` con el `Dockerfile` |
 | Repositorio | https://github.com/scharick/todos-api | Cada `git push` a `main` vuelve a desplegar los dos |
 
-Variables en Render (nunca en el repo): `DB_URL`, `DB_USER`, `DB_PASSWORD` y `CORS_ORIGINS=https://todos-api-frontend.vercel.app,http://localhost:5173`.
+Variables en Render (nunca en el repo): `DB_URL`, `DB_USER`, `DB_PASSWORD`, `APP_USER`, `APP_PASSWORD` y `CORS_ORIGINS=https://todos-api-frontend.vercel.app,http://localhost:5173`.
 
 Pruebas de fuego: `bash scripts/prueba-de-fuego.sh https://todos-api-hoal.onrender.com https://todos-api-frontend.vercel.app`.
 
@@ -191,7 +196,7 @@ Pruebas de fuego: `bash scripts/prueba-de-fuego.sh https://todos-api-hoal.onrend
 
 ## 11. Fuera de alcance
 
-Autenticación/usuarios, paginación y un frontend completo (solo habrá uno pequeño para consumir la API). Se pueden añadir después como mejoras.
+Registro de usuarios y varios usuarios (hay uno solo), paginación y un frontend completo (solo habrá uno pequeño para consumir la API). Se pueden añadir después como mejoras.
 
 ## 12. Criterios de aceptación del back
 
@@ -240,3 +245,13 @@ Formato Dado / Cuando / Entonces. Cada operación tiene al menos un caso de erro
 ### Transversal
 
 - **CA-T.1 (error)** Dado un error inesperado en el servidor, cuando hago cualquier petición, entonces recibo `500` con el mensaje `Error interno del servidor` y la respuesta no incluye stack traces, nombres de clases ni SQL.
+
+### Seguridad (Spring Security)
+
+- **CA-S.1** Dado que no inicié sesión, cuando hago `GET /api/todos` o `GET /api/todos/1`, entonces recibo `200`: leer es público.
+- **CA-S.2 (error)** Dado que no inicié sesión, cuando hago `POST`, `PUT`, `PATCH` o `DELETE` sobre `/api/todos`, entonces recibo `401` con el mensaje `Debes iniciar sesión para hacer esto`, sin la cabecera `WWW-Authenticate`, y no cambia nada.
+- **CA-S.3 (error)** Dado un usuario con una contraseña incorrecta, cuando hago `DELETE /api/todos/1`, entonces recibo `401` con el mensaje `Usuario o contraseña incorrectos` y la tarea no se borra.
+- **CA-7.1** Dado el usuario y la contraseña correctos, cuando hago `GET /api/auth/me`, entonces recibo `200` con `{"username": "<usuario>"}`.
+- **CA-7.2 (error)** Dado que no inicié sesión, cuando hago `GET /api/auth/me`, entonces recibo `401`.
+- **CA-S.4 (error)** Dado que faltan `APP_USER` o `APP_PASSWORD`, o que la contraseña tiene menos de 12 caracteres, cuando arranca la app, entonces la app no arranca.
+- **CA-S.5 (error)** Dado que no inicié sesión, cuando llamo a una ruta que no está en el contrato, entonces recibo `401` (cerrado por defecto).

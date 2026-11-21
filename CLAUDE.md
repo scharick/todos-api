@@ -39,8 +39,9 @@ Usa la skill [backend-seguro](.claude/skills/backend-seguro/SKILL.md) siempre qu
 - Implementa exactamente el contrato: mismas rutas, códigos HTTP y mensajes. No inventes endpoints.
 - Toda regla de SPECS §3 se cumple en la capa indicada en modelo.md §7; la BD es solo el respaldo.
 - Los errores pasan por `GlobalExceptionHandler`. Nunca se devuelven stack traces, nombres de clases, SQL ni mensajes de Postgres.
-- Los secretos (`DB_URL`, `DB_USER`, `DB_PASSWORD`) solo van en variables de entorno. Nunca en `application.properties`, en el código ni en git.
+- Los secretos (`DB_URL`, `DB_USER`, `DB_PASSWORD`, `APP_PASSWORD`) solo van en variables de entorno. Nunca en `application.properties`, en el código ni en git.
 - El esquema solo cambia con una migración nueva en `supabase/migrations/` (`ddl-auto=validate`). Toda tabla nueva lleva RLS activado.
+- Spring Security (`config/SecurityConfig.java`): `GET` de tareas es público; todo lo demás exige HTTP Basic. Toda ruta nueva queda protegida por defecto; si debe ser pública, agrégala al contrato primero.
 - CORS solo para los orígenes de `CORS_ORIGINS` (la URL de Vercel y `http://localhost:*`), nunca `*`.
 - Cada criterio de SPECS §12 tiene su prueba. Una tarea no está terminada si `./mvnw test` falla.
 

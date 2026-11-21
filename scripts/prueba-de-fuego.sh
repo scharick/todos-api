@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Pruebas de fuego contra el despliegue público.
-# Uso: bash scripts/prueba-de-fuego.sh https://<app>.onrender.com https://<front>.vercel.app
+# Uso: APP_USER=... APP_PASSWORD=... bash scripts/prueba-de-fuego.sh https://<app>.onrender.com https://<front>.vercel.app
 # Crea una tarea de prueba y la borra al final: la tabla queda como estaba.
 
 API="${1:?Falta la URL de Render}"; FRONT="${2:?Falta la URL de Vercel}"
 API="${API%/}"; FRONT="${FRONT%/}"
+: "${APP_USER:?Falta APP_USER}" "${APP_PASSWORD:?Falta APP_PASSWORD}"
+LOGIN="$APP_USER:$APP_PASSWORD"
 pasa=0; falla=0
 
 check() { # descripción, esperado, obtenido
@@ -28,17 +30,24 @@ check "GET /api/todos devuelve una lista"     "["              "$(curl -s "$API/
 check "GET tarea inexistente → 404"           "no existe"      "$(curl -s "$API/api/todos/999999")"
 check "GET id no numérico → 400"              "El id debe ser un número" "$(curl -s "$API/api/todos/abc")"
 check "POST título vacío → 400"               "El título es obligatorio" \
-  "$(curl -s -X POST "$API/api/todos" -H 'Content-Type: application/json' -d '{"title":"   "}')"
+  "$(curl -s -u "$LOGIN" -X POST "$API/api/todos" -H 'Content-Type: application/json' -d '{"title":"   "}')"
 check "JSON roto sin detalles internos"       "El cuerpo de la petición no es válido" \
-  "$(curl -s -X POST "$API/api/todos" -H 'Content-Type: application/json' -d '{"title":')"
+  "$(curl -s -u "$LOGIN" -X POST "$API/api/todos" -H 'Content-Type: application/json' -d '{"title":')"
 
-creada=$(curl -s -X POST "$API/api/todos" -H 'Content-Type: application/json' -H "Origin: $FRONT" \
+creada=$(curl -s -u "$LOGIN" -X POST "$API/api/todos" -H 'Content-Type: application/json' -H "Origin: $FRONT" \
   -d '{"title":"Prueba de fuego"}')
 id=$(echo "$creada" | grep -o '"id":[0-9]*' | grep -o '[0-9]*')
 check "POST crea en Supabase"                 '"title":"Prueba de fuego"' "$creada"
-check "PATCH toggle"                          '"completed":true' "$(curl -s -X PATCH "$API/api/todos/$id/toggle")"
-check "DELETE → 204"                          "204"            "$(code -X DELETE "$API/api/todos/$id")"
-check "DELETE otra vez → 404"                 "404"            "$(code -X DELETE "$API/api/todos/$id")"
+check "PATCH toggle"                          '"completed":true' "$(curl -s -u "$LOGIN" -X PATCH "$API/api/todos/$id/toggle")"
+check "DELETE → 204"                          "204"            "$(code -u "$LOGIN" -X DELETE "$API/api/todos/$id")"
+check "DELETE otra vez → 404"                 "404"            "$(code -u "$LOGIN" -X DELETE "$API/api/todos/$id")"
+
+echo "--- Spring Security"
+check "POST sin login -> 401" "Debes iniciar sesión para hacer esto"   "$(curl -s -X POST "$API/api/todos" -H 'Content-Type: application/json' -d '{"title":"Intruso"}')"
+check "DELETE con clave incorrecta -> 401" "Usuario o contraseña incorrectos"   "$(curl -s -u "$APP_USER:clave-incorrecta-123" -X DELETE "$API/api/todos/1")"
+check "401 sin ventana del navegador" "0" "$(curl -s -i -X DELETE "$API/api/todos/1" | grep -ci 'www-authenticate')"
+check "GET /api/auth/me con login -> 200" "\"username\":\"$APP_USER\"" "$(curl -s -u "$LOGIN" "$API/api/auth/me")"
+check "la tarea 1 sigue existiendo" "200" "$(code "$API/api/todos/1")"
 
 echo "--- CORS"
 check "permite el origen de Vercel" "access-control-allow-origin: $FRONT" \

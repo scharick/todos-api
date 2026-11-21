@@ -17,7 +17,7 @@ erDiagram
 
 El modelo tiene **una sola entidad** y, por tanto, **no hay relaciones** ni claves foráneas. Usuarios y categorías quedan fuera de alcance (SPECS §11).
 
-**Dueño de la fila:** ningún usuario. En el MVP no hay login, así que todas las filas de `todos` pertenecen a **la aplicación**: hay una sola lista compartida y cualquier cliente de la API puede leer y modificar cualquier tarea. Cuando se agreguen usuarios, la tabla tendrá una columna `user_id` (FK) que indique el dueño (ver §5).
+**Dueño de la fila:** ningún usuario. En el MVP no hay login, así que todas las filas de `todos` pertenecen a **la aplicación**: hay una sola lista compartida y cualquier cliente de la API puede leer y modificar cualquier tarea. Para **escribir** hace falta iniciar sesión con el único usuario de la app (Spring Security, `APP_USER`/`APP_PASSWORD`); leer es público. Ese usuario no es dueño de filas concretas, así que no hace falta una columna `user_id`. Cuando haya varios usuarios, la tabla tendrá una columna `user_id` (FK) que indique el dueño (ver §5).
 
 ## 2. Diccionario de datos
 

@@ -12,7 +12,7 @@ Basado en [SPECS.md](../../SPECS.md) y en el modelo aprobado [docs/datos/modelo.
 | URL base producción | `https://<app>.onrender.com` |
 | Formato | JSON (`Content-Type: application/json`), UTF-8 |
 | Fechas | ISO 8601 con zona horaria, en hora de Colombia. Ej.: `2026-11-20T10:30:00-05:00` |
-| Autenticación | Ninguna. Todas las operaciones son **públicas** (SPECS §11) |
+| Autenticación | Leer es **público**. Crear, editar, marcar y eliminar exigen **HTTP Basic** (ver *Autenticación*) |
 | Campos desconocidos en el cuerpo | Se ignoran |
 | `id` y `createdAt` en el cuerpo | Se ignoran; los asigna el servidor (regla 4) |
 
@@ -49,10 +49,23 @@ Basado en [SPECS.md](../../SPECS.md) y en el modelo aprobado [docs/datos/modelo.
 | Código | ¿Aplica? | Motivo |
 |--------|----------|--------|
 | `400` Bad Request | Sí | Datos de entrada inválidos |
-| `401` Unauthorized | **No** | No hay login; todas las operaciones son públicas. Aparecerá cuando se agreguen usuarios |
+| `401` Unauthorized | Sí | Escrituras sin credenciales o con credenciales incorrectas (Op. 3 a 7) |
 | `404` Not Found | Sí | La tarea no existe o ya fue borrada |
 | `409` Conflict | **No** | No hay reglas de unicidad aparte del `id` (se permiten títulos repetidos) ni estados que choquen: se puede editar una tarea completada |
 | `500` Internal Server Error | Sí (todas) | Error inesperado. Mensaje: `Error interno del servidor` |
+
+### Autenticación (Spring Security)
+
+- Hay **un solo usuario**. Su nombre y su contraseña salen de las variables de entorno `APP_USER` y `APP_PASSWORD` del servidor. Si faltan, o si la contraseña tiene menos de 12 caracteres, la app **no arranca**: no existe una contraseña por defecto.
+- Se envía en cada petición de escritura con la cabecera `Authorization: Basic <base64(usuario:contraseña)>`. No hay cookies ni sesión en el servidor.
+- El `401` **no** incluye la cabecera `WWW-Authenticate`, para que el navegador no muestre su propia ventana de login.
+- La autenticación se comprueba **antes** que todo lo demás: una escritura sin login da `401` aunque el cuerpo o el id sean inválidos.
+- Cualquier ruta que no esté en este contrato también exige login (cerrado por defecto).
+
+| Caso | Código | Mensaje |
+|------|--------|---------|
+| Escritura sin cabecera `Authorization` | `401` | `Debes iniciar sesión para hacer esto` |
+| Usuario o contraseña incorrectos | `401` | `Usuario o contraseña incorrectos` |
 
 ### Validaciones compartidas
 
@@ -78,6 +91,7 @@ Basado en [SPECS.md](../../SPECS.md) y en el modelo aprobado [docs/datos/modelo.
 | Editar una tarea | [Op. 4](#op-4--editar-una-tarea) `PUT /api/todos/{id}` |
 | Marcar o desmarcar como completada | [Op. 5](#op-5--marcardesmarcar-como-completada) `PATCH /api/todos/{id}/toggle` |
 | Eliminar una tarea | [Op. 6](#op-6--eliminar-una-tarea) `DELETE /api/todos/{id}` |
+| Iniciar sesión | [Op. 7](#op-7--comprobar-la-sesión) `GET /api/auth/me` |
 
 ---
 
@@ -155,7 +169,7 @@ Basado en [SPECS.md](../../SPECS.md) y en el modelo aprobado [docs/datos/modelo.
 
 ## Op. 3 — Crear una tarea
 
-**`POST /api/todos`** · Quién: cualquiera (pública)
+**`POST /api/todos`** · Quién: usuario autenticado (HTTP Basic)
 
 **Entrada (cuerpo)**: ver *Cuerpo de tarea* en §1.
 
@@ -186,6 +200,8 @@ Basado en [SPECS.md](../../SPECS.md) y en el modelo aprobado [docs/datos/modelo.
 | `400` | `title` falta, es `null`, está vacío o solo tiene espacios | `El título es obligatorio` |
 | `400` | `title` tiene más de 100 caracteres después del recorte | `El título no puede superar 100 caracteres` |
 | `400` | `description` tiene más de 500 caracteres | `La descripción no puede superar 500 caracteres` |
+| `401` | No se envió `Authorization` | `Debes iniciar sesión para hacer esto` |
+| `401` | Usuario o contraseña incorrectos | `Usuario o contraseña incorrectos` |
 | `500` | Error inesperado | `Error interno del servidor` |
 
 Si hay un `400`, no se crea nada (regla 8).
@@ -194,7 +210,7 @@ Si hay un `400`, no se crea nada (regla 8).
 
 ## Op. 4 — Editar una tarea
 
-**`PUT /api/todos/{id}`** · Quién: cualquiera (pública)
+**`PUT /api/todos/{id}`** · Quién: usuario autenticado (HTTP Basic)
 
 Reemplazo completo: los campos que no se envían toman su valor por defecto (`description` → `null`, `completed` → `false`). `id` y `createdAt` no cambian nunca (reglas 5 y 7).
 
@@ -235,6 +251,8 @@ Reemplazo completo: los campos que no se envían toman su valor por defecto (`de
 | `400` | `title` tiene más de 100 caracteres después del recorte | `El título no puede superar 100 caracteres` |
 | `400` | `description` tiene más de 500 caracteres | `La descripción no puede superar 500 caracteres` |
 | `404` | No existe una tarea con ese id | `Todo con id {id} no existe` |
+| `401` | No se envió `Authorization` | `Debes iniciar sesión para hacer esto` |
+| `401` | Usuario o contraseña incorrectos | `Usuario o contraseña incorrectos` |
 | `500` | Error inesperado | `Error interno del servidor` |
 
 Orden de las comprobaciones: primero el id (`400`), luego el cuerpo (`400`) y al final que la tarea exista (`404`). Si hay un `400`, la tarea queda como estaba (regla 8).
@@ -243,7 +261,7 @@ Orden de las comprobaciones: primero el id (`400`), luego el cuerpo (`400`) y al
 
 ## Op. 5 — Marcar/desmarcar como completada
 
-**`PATCH /api/todos/{id}/toggle`** · Quién: cualquiera (pública)
+**`PATCH /api/todos/{id}/toggle`** · Quién: usuario autenticado (HTTP Basic)
 
 Invierte `completed`: `false` → `true` y `true` → `false`. No cambia ningún otro campo.
 
@@ -272,13 +290,15 @@ Invierte `completed`: `false` → `true` y `true` → `false`. No cambia ningún
 |--------|--------|---------|
 | `400` | El id no es un número | `El id debe ser un número` |
 | `404` | No existe una tarea con ese id | `Todo con id {id} no existe` |
+| `401` | No se envió `Authorization` | `Debes iniciar sesión para hacer esto` |
+| `401` | Usuario o contraseña incorrectos | `Usuario o contraseña incorrectos` |
 | `500` | Error inesperado | `Error interno del servidor` |
 
 ---
 
 ## Op. 6 — Eliminar una tarea
 
-**`DELETE /api/todos/{id}`** · Quién: cualquiera (pública)
+**`DELETE /api/todos/{id}`** · Quién: usuario autenticado (HTTP Basic)
 
 Borrado físico: la tarea deja de existir (modelo, pregunta 6).
 
@@ -296,4 +316,30 @@ Borrado físico: la tarea deja de existir (modelo, pregunta 6).
 |--------|--------|---------|
 | `400` | El id no es un número | `El id debe ser un número` |
 | `404` | No existe una tarea con ese id, o ya fue borrada | `Todo con id {id} no existe` |
+| `401` | No se envió `Authorization` | `Debes iniciar sesión para hacer esto` |
+| `401` | Usuario o contraseña incorrectos | `Usuario o contraseña incorrectos` |
+| `500` | Error inesperado | `Error interno del servidor` |
+
+---
+
+## Op. 7 — Comprobar la sesión
+
+**`GET /api/auth/me`** · Quién: usuario autenticado (HTTP Basic)
+
+El front la usa al iniciar sesión para comprobar el usuario y la contraseña antes de mostrar los controles de escritura.
+
+**Entrada:** solo la cabecera `Authorization`.
+
+**Respuesta exitosa: `200 OK`**
+
+```json
+{ "username": "admin" }
+```
+
+**Errores**
+
+| Código | Cuándo | Mensaje |
+|--------|--------|---------|
+| `401` | No se envió `Authorization` | `Debes iniciar sesión para hacer esto` |
+| `401` | Usuario o contraseña incorrectos | `Usuario o contraseña incorrectos` |
 | `500` | Error inesperado | `Error interno del servidor` |
