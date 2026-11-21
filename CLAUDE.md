@@ -20,9 +20,12 @@ MVP académico: API REST de tareas (CRUD) con un front pequeño que la consume.
 ## Comandos
 
 ```powershell
-./mvnw spring-boot:run   # levantar en http://localhost:8080
-./mvnw test              # pruebas
+./mvnw spring-boot:run   # backend en http://localhost:8080 (lee .env)
+./mvnw test              # pruebas del backend (no usan la BD)
+python -m http.server 5173 -d frontend   # front en http://localhost:5173
 ```
+
+El front (`frontend/`) es HTML, CSS y JS sin compilación. La URL del backend está en `frontend/config.js`. Los datos del servidor se pintan solo con `textContent`, nunca con `innerHTML`.
 
 ## Backend
 

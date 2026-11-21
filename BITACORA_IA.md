@@ -147,6 +147,33 @@ Los otros 4 puntos (`id` y `created_at` en cada tabla, FK en las relaciones, `UN
 - SPECS: el front en Vercel entra al alcance y CORS se limita a `CORS_ORIGINS` (F1).
 - Fugas F4 y F5 cerradas.
 
+## Lab 10 — Backend y front conectados a Supabase
+
+**Prompt:** "Los entregables de hoy son todo el backend, conectado con la base de datos y el frontend".
+
+**Qué hizo la IA**
+- Backend Spring Boot según el contrato: entidad, DTOs, servicio, controlador, `GlobalExceptionHandler` y CORS. Lo hizo aplicando la skill `backend-seguro`.
+- 38 pruebas (controlador y servicio) que cubren los criterios de SPECS §12, CORS y la prueba de que un error no muestra detalles internos.
+- Prueba contra Supabase real: CRUD completo, todos los errores del contrato, filtro y CORS.
+- Front en `frontend/` (HTML, CSS y JS), probado en un navegador simulado (jsdom) contra el backend real: crear, error de validación, toggle, filtro, editar, eliminar y XSS.
+
+**Qué corregimos**
+- **Contrato imposible de cumplir:** decía que en `PUT` se comprueba primero la existencia (`404`) y después el cuerpo (`400`). Spring lee el JSON antes, así que se cambió el contrato a: id → cuerpo → existencia.
+- **Conexión fallida:** en `.env` pusimos el host de la conexión directa (`db.<ref>.supabase.co`, solo IPv6). Se cambió al del Session pooler.
+- **Fecha distinta entre `POST` y `GET`:** Java generaba 7 decimales y Postgres guarda 6. Se recorta a microsegundos.
+- **Front:** `form.title` choca con la propiedad `title` de los elementos HTML. Se cambió por `form.elements.namedItem("title")`.
+
+**Fugas nuevas y cómo se cerraron**
+
+| ID | Fuga | Riesgo | Cómo se cerró | Estado |
+|----|------|--------|---------------|--------|
+| F7 | La prueba `TodosApplicationTests` de la plantilla arrancaba la app completa | `./mvnw test` se conectaba a la BD de producción | Se eliminó; las pruebas usan *mocks* y no tocan la BD | Cerrada |
+| F8 | Un `@ExceptionHandler(Exception.class)` sin más manejadores convierte rutas inexistentes y métodos no permitidos en `500` | Respuestas `500` engañosas y ruido en los logs | Manejadores explícitos para `404 Recurso no encontrado`, `405` y `415` | Cerrada |
+| F9 | Spring convierte `"yes"`, `"1"` y `"on"` en `true` para `?completed=` | Se aceptaban valores fuera del contrato | El parámetro se lee como texto y solo se aceptan `true`/`false` | Cerrada |
+| F10 | XSS en el front si se pintan títulos con `innerHTML` | Un título con HTML podía ejecutar código en el navegador de otro usuario | Solo `textContent` + Content-Security-Policy; probado con `<img onerror>` | Cerrada |
+| F11 | `CORS_ORIGINS=*` mal configurado en Render | Volvería a abrir F1 | `CorsConfig` descarta `*` aunque esté configurado | Cerrada |
+| — | `spring-boot-devtools` en el `pom.xml` | Herramienta de desarrollo | Justificada: es `optional` y Spring Boot no la incluye en el `.jar` de producción | Justificada |
+
 ## Pendiente de revisar por nosotros
 
 - Confirmar con el profesor la arquitectura: Spring Boot en Render y un front pequeño en Vercel, en lugar de Next.js.
