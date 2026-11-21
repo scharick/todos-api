@@ -2,7 +2,7 @@
 
 ## 1. Objetivo
 
-Construir un backend REST sencillo para gestionar una lista de tareas (CRUD) y desplegarlo en internet con una URL pública.
+Construir un backend REST sencillo para gestionar una lista de tareas (CRUD) y desplegarlo en internet con una URL pública, más un front pequeño en Vercel que lo consume.
 
 ## 2. Stack tecnológico
 
@@ -14,7 +14,8 @@ Construir un backend REST sencillo para gestionar una lista de tareas (CRUD) y d
 | Validación      | Jakarta Bean Validation (`spring-boot-starter-validation`) |
 | Utilidades      | Lombok                                     |
 | Build           | Maven (wrapper `mvnw`)                     |
-| Despliegue      | Docker + Render (plan gratuito)            |
+| Despliegue back | Docker + Render (plan gratuito)            |
+| Front           | Pequeño, desplegado en Vercel; consume esta API |
 
 > La base de datos es PostgreSQL en Supabase (plan gratuito): no hay que instalar nada y los datos se conservan cuando el servidor se reinicia. El esquema se crea con las migraciones de `supabase/migrations/`, no con Hibernate.
 
@@ -162,7 +163,7 @@ spring.jpa.hibernate.ddl-auto=validate
 
 ## 8. Requisitos no funcionales
 
-- **CORS** habilitado para cualquier origen, para que un frontend pueda consumir la API.
+- **CORS** habilitado solo para los orígenes de la variable `CORS_ORIGINS`: la URL del front en Vercel y `http://localhost:*` para desarrollo. Nunca `*`.
 - **Datos de ejemplo**: 3 tareas cargadas una sola vez en la BD con [supabase/seed.sql](supabase/seed.sql). La app no carga datos al arrancar, para no duplicarlos.
 - **Pruebas**: al menos una prueba de controlador (`@WebMvcTest` o `MockMvc`) por endpoint principal.
 
@@ -185,7 +186,7 @@ spring.jpa.hibernate.ddl-auto=validate
 
 ## 11. Fuera de alcance
 
-Autenticación/usuarios, paginación y frontend. Se pueden añadir después como mejoras.
+Autenticación/usuarios, paginación y un frontend completo (solo habrá uno pequeño para consumir la API). Se pueden añadir después como mejoras.
 
 ## 12. Criterios de aceptación del back
 
