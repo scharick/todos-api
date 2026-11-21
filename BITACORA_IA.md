@@ -17,8 +17,15 @@ Proyecto: API de Tareas (Todos). Backend Spring Boot 4.1.1 (Java 21) en Render, 
 | 6 | "Usa el MCP de Supabase… crea UNA migración con tablas, FK, UNIQUE, CHECK, RLS… muéstrame el SQL y ESPERA mi aprobación" | Profesor (prompt 3) | [Migración](supabase/migrations/20261120000000_crear_tabla_todos.sql) y [seed](supabase/seed.sql) |
 | 7 | "Consultas de comprobación, incluida la doble reserva que debe fallar, y los advisors de seguridad" | Lab | [supabase/verificacion.sql](supabase/verificacion.sql) |
 | 8 | "Entregables de la unidad…" y "mantener Spring Boot y agregar un front pequeño en Vercel" | Lab + nosotros | Lab 9: [CLAUDE.md](CLAUDE.md), skill `backend-seguro`, reglas por capa |
+| 9 | "Los entregables de hoy son todo el backend, conectado con la base de datos y el frontend" | Nosotros | Backend, 38 pruebas y front (Lab 10) |
+| 10 | "Sube al repositorio" y "vamos a desplegarlo con Vercel" | Nosotros | GitHub, Render y Vercel; pruebas de fuego (Lab 11) |
+| 11 | "Necesito que tenga un Spring Security" | Nosotros | Login HTTP Basic y Op. 7 (Lab 12) |
+| 12 | "Hagamos el reporte de auditoría" | Nosotros | [docs/auditoria/reporte.md](docs/auditoria/reporte.md) (Lab 13) |
+| 13 | "En parejas cruzadas: doble reserva al mismo tiempo y 'A intenta cancelar la reserva de B', sobre la URL pública" | Profesor | `scripts/prueba-de-fuego-cruzada.sh`; bug de concurrencia F19 (Lab 14) |
 
 ## Fugas que dejó la IA y cómo las cerramos
+
+Resumen de las 19 fugas (F1 a F19). Cada lab tiene el detalle; la auditoría las consolida en [docs/auditoria/reporte.md](docs/auditoria/reporte.md).
 
 "Fuga" = un hueco de seguridad que quedó en una propuesta o en la configuración.
 
@@ -31,6 +38,19 @@ Proyecto: API de Tareas (Todos). Backend Spring Boot 4.1.1 (Java 21) en Render, 
 | F5 | `.env` no estaba en `.gitignore` | IA, Lab 7: pasó a variables de entorno sin protegerlas | Un `.env` con la contraseña de la BD podía subirse a GitHub | Se agregaron `.env` y `.env.*` a `.gitignore` | Cerrada |
 | F6 | Los errores de Postgres revelan nombres de restricciones, columnas y tipos (visto en las pruebas del Lab 7) | Comportamiento por defecto | Si el backend los reenvía, el usuario ve detalles internos | Regla 10, `GlobalExceptionHandler` (modelo §7) y skill `backend-seguro` §4 | Cerrada en el diseño; falta comprobarla en el código y en la auditoría |
 | — | Advisor `rls_enabled_no_policy` (INFO) | Advisor de Supabase | Ninguno: es intencional | Justificada: el dueño de las filas es la aplicación y `anon` no tiene acceso (verificado en el Lab 8) | Justificada |
+| F7 | La prueba de la plantilla arrancaba la app completa | Plantilla, Lab 10 | `./mvnw test` se conectaba a la BD de producción | Se eliminó; las pruebas usan *mocks* | Cerrada |
+| F8 | Rutas inexistentes y métodos no permitidos daban `500` | IA, Lab 10 | Respuestas engañosas | Manejadores `404`/`405`/`415` | Cerrada |
+| F9 | `?completed=yes/1/on` se aceptaba como `true` | Por defecto, Lab 10 | Valores fuera del contrato | Solo `true`/`false` | Cerrada |
+| F10 | XSS si el front usara `innerHTML` | Riesgo del front, Lab 10 | Ejecutar código en el navegador de otro | `textContent` + CSP; probado | Cerrada |
+| F11 | `CORS_ORIGINS=*` mal configurado | Configuración, Lab 10 | Reabriría F1 | `SecurityConfig` descarta `*` | Cerrada |
+| F12 | CSP del front permitía cualquier `*.onrender.com` | IA, Lab 11 | Un script inyectado podía enviar datos a otro servicio | `connect-src` solo para nuestro backend | Cerrada |
+| F13 | Contenedor como root | Imagen base, Lab 11 | Root dentro del contenedor si vulneran la app | Usuario `app` en el `Dockerfile` | Cerrada |
+| F14 | Spring Security imprime una contraseña generada en el log | Por defecto, Lab 12 | Contraseña en los logs de Render | `UserDetailsService` propio | Cerrada |
+| F15 | `WWW-Authenticate: Basic` abría la ventana de login del navegador | Por defecto, Lab 12 | Se saltaba el login del front | `AuthenticationEntryPoint` propio | Cerrada |
+| F16 | Riesgo de usuario o contraseña por defecto | IA, Lab 12 | Cualquiera podría escribir | Sin valores por defecto; la app no arranca sin ellos | Cerrada |
+| F17 | `/error` con otro formato y con `path` | Por defecto, Lab 12 | Rompía la regla 10 | `ErrorPageController` | Cerrada |
+| F18 | Credencial en `localStorage` | IA, Lab 12 | Un XSS la robaría | Solo en memoria | Cerrada |
+| F19 | 10 `DELETE` simultáneos daban `2×500` (leer y luego borrar) | IA, Lab 10; la encontró la prueba del profesor en el Lab 14 | Errores en producción y cambios perdidos | Borrado y `toggle` atómicos; `409` en `PUT` | Cerrada |
 | — | `.mcp.json` en git con el `project_ref` | IA, Lab 6 | Bajo: el `project_ref` no es un secreto y el acceso exige iniciar sesión | Justificada: no tiene llaves ni tokens | Justificada |
 
 ## Lab 1 — Specs del proyecto
