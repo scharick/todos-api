@@ -234,6 +234,20 @@ Los otros 4 puntos (`id` y `created_at` en cada tabla, FK en las relaciones, `UN
 | — | CSRF desactivado | Ninguno mientras no haya cookies | Justificada: la credencial viaja en la cabecera `Authorization`, que un sitio ajeno no puede enviar | Justificada |
 | — | HTTP Basic no limita los intentos de login | Fuerza bruta contra la contraseña | Justificada para el MVP: contraseña de 12+ caracteres, BCrypt (lento) y HTTPS. Mejora futura: limitar intentos | Justificada |
 
+## Lab 13 — Auditoría de seguridad
+
+**Prompt:** "hagamos el reporte de auditoría".
+
+**Qué hizo la IA:** auditó el commit `9009c61` con la skill `backend-seguro`. Revisó el historial de git, corrió las pruebas automáticas (50/50), las pruebas de fuego (21/21) y el navegador simulado en producción, mandó entradas hostiles a producción y revisó Supabase (advisors, roles e intento de acceso por la Data API con la llave pública). Resultado: [docs/auditoria/reporte.md](docs/auditoria/reporte.md).
+
+**Resultado:** 28 hallazgos: 18 corregidos (incluye F1 a F18), 10 justificados y **0 abiertos**. Checklist `backend-seguro`: 34 de 34.
+
+**Hallazgos nuevos de la auditoría**
+- **H-19 (Media):** el backend usa el rol `postgres`, que se salta RLS. Se acepta para el MVP y queda un plan: rol `todos_app` con permisos mínimos.
+- **H-21 (Baja):** una ruta con `%2f` recibe la página HTML de Tomcat. Justificado: no muestra la versión y no llega a la app.
+- **H-22 (Baja):** la Data API de Supabase confirma que la tabla existe, pero niega leer, insertar y borrar (verificado).
+- La auditoría **no** corrió un escáner automático de dependencias; queda como recomendación.
+
 ## Pendiente de revisar por nosotros
 
 - Confirmar con el profesor la arquitectura: Spring Boot en Render y un front pequeño en Vercel, en lugar de Next.js.

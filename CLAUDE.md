@@ -17,7 +17,8 @@ Después de desplegar, corre `bash scripts/prueba-de-fuego.sh <url-render> <url-
 1. [docs/contratos/api.md](docs/contratos/api.md): rutas, entradas, respuestas, errores y mensajes. **Si algo no coincide, manda el contrato.**
 2. [docs/datos/modelo.md](docs/datos/modelo.md): tabla `todos` y qué capa cumple cada regla (§7).
 3. [SPECS.md](SPECS.md): reglas (§3), configuración (§7) y criterios de aceptación del back (§12).
-4. [BITACORA_IA.md](BITACORA_IA.md): registra ahí los prompts clave y cualquier fuga de seguridad encontrada y cómo se cerró.
+4. [docs/auditoria/reporte.md](docs/auditoria/reporte.md): auditoría de seguridad; un hallazgo nuevo se agrega ahí como corregido o justificado.
+5. [BITACORA_IA.md](BITACORA_IA.md): registra ahí los prompts clave y cualquier fuga de seguridad encontrada y cómo se cerró.
 
 ## Comandos
 
