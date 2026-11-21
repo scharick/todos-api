@@ -1,9 +1,37 @@
 # Bitácora de uso de IA
 
 Asistente: Claude Code (Claude Opus 5.5), en VS Code.
-Proyecto: API de Tareas (Todos) — Spring Boot 4.1.1, Java 21.
+Proyecto: API de Tareas (Todos). Backend Spring Boot 4.1.1 (Java 21) en Render, BD PostgreSQL en Supabase y un front pequeño en Vercel.
 
 > **Cómo trabajamos:** en varios pasos le dijimos a la IA que aceptábamos lo que ella considerara mejor. Por eso la mayoría de las decisiones las propuso la IA y las aceptamos sin cambios. Las correcciones de este registro salieron de revisar el trabajo con el **checklist del interventor** y con el **prompt del profesor**, no de cambios manuales nuestros.
+
+## Prompts clave
+
+| # | Prompt (resumido) | Origen | Resultado |
+|---|-------------------|--------|-----------|
+| 1 | "El profe me mandó hacer un backend y desplegarlo… primero vamos a hacer las specs" | Nosotros | [SPECS.md](SPECS.md) |
+| 2 | "Releer las specs. Subrayen los sustantivos (entidades) y escriban al margen lo que nunca puede pasar" | Lab | Entidad `Todo` y las 10 reglas de SPECS §3 |
+| 3 | "Entrevista de datos: la IA pregunta, ustedes deciden. Resultado: `docs/datos/modelo.md` con ER en Mermaid" | Lab | [docs/datos/modelo.md](docs/datos/modelo.md) |
+| 4 | "Pasen el checklist del interventor. Lo que no pase se corrige antes de seguir" | Lab | 4 puntos corregidos (Lab 4) |
+| 5 | "Con el modelo aprobado y las specs, escribe `docs/contratos/api.md`… errores 400, 401, 404, 409… Luego agrega 'Criterios de aceptación del back' en Dado/Cuando/Entonces" | Profesor | [docs/contratos/api.md](docs/contratos/api.md) y SPECS §12 |
+| 6 | "Usa el MCP de Supabase… crea UNA migración con tablas, FK, UNIQUE, CHECK, RLS… muéstrame el SQL y ESPERA mi aprobación" | Profesor (prompt 3) | [Migración](supabase/migrations/20261120000000_crear_tabla_todos.sql) y [seed](supabase/seed.sql) |
+| 7 | "Consultas de comprobación, incluida la doble reserva que debe fallar, y los advisors de seguridad" | Lab | [supabase/verificacion.sql](supabase/verificacion.sql) |
+| 8 | "Entregables de la unidad…" y "mantener Spring Boot y agregar un front pequeño en Vercel" | Lab + nosotros | Lab 9: [CLAUDE.md](CLAUDE.md), skill `backend-seguro`, reglas por capa |
+
+## Fugas que dejó la IA y cómo las cerramos
+
+"Fuga" = un hueco de seguridad que quedó en una propuesta o en la configuración.
+
+| ID | Fuga | Origen | Riesgo | Cómo se cerró | Estado |
+|----|------|--------|--------|---------------|--------|
+| F1 | CORS para **cualquier origen** (SPECS §8) | IA, Lab 1 | Cualquier sitio web podía llamar a la API desde el navegador de un usuario | Solo los orígenes de `CORS_ORIGINS` (Vercel y localhost), nunca `*` | Cerrada en specs; se verifica en la auditoría |
+| F2 | Consola H2 habilitada (`spring.h2.console.enabled=true`) | IA, Lab 1 | En producción habría expuesto una consola web de la BD | Se eliminó al pasar a PostgreSQL de Supabase | Cerrada |
+| F3 | `ddl-auto=update` | IA, Lab 1 | Hibernate podía cambiar el esquema en producción y saltarse RLS y los `CHECK` de la migración | `ddl-auto=validate`; el esquema solo cambia con migraciones | Cerrada |
+| F4 | Conector MCP con permiso de escritura | Proceso, Lab 7: quitamos `read_only` para aplicar la migración y no lo restauramos | La IA podía modificar o borrar datos de Supabase sin necesidad | Se restauró `read_only=true` en `.mcp.json` | Cerrada |
+| F5 | `.env` no estaba en `.gitignore` | IA, Lab 7: pasó a variables de entorno sin protegerlas | Un `.env` con la contraseña de la BD podía subirse a GitHub | Se agregaron `.env` y `.env.*` a `.gitignore` | Cerrada |
+| F6 | Los errores de Postgres revelan nombres de restricciones, columnas y tipos (visto en las pruebas del Lab 7) | Comportamiento por defecto | Si el backend los reenvía, el usuario ve detalles internos | Regla 10, `GlobalExceptionHandler` (modelo §7) y skill `backend-seguro` §4 | Cerrada en el diseño; falta comprobarla en el código y en la auditoría |
+| — | Advisor `rls_enabled_no_policy` (INFO) | Advisor de Supabase | Ninguno: es intencional | Justificada: el dueño de las filas es la aplicación y `anon` no tiene acceso (verificado en el Lab 8) | Justificada |
+| — | `.mcp.json` en git con el `project_ref` | IA, Lab 6 | Bajo: el `project_ref` no es un secreto y el acceso exige iniciar sesión | Justificada: no tiene llaves ni tokens | Justificada |
 
 ## Lab 1 — Specs del proyecto
 
@@ -105,7 +133,21 @@ Los otros 4 puntos (`id` y `created_at` en cada tabla, FK en las relaciones, `UN
 
 **Qué corregimos:** nada; los resultados coinciden con lo esperado.
 
+## Lab 9 — Revisión de entregables
+
+**Qué propuso la IA:** comparar la lista de entregables con el repo. Faltaban la tabla "regla → capa", `CLAUDE.md`, la skill `backend-seguro` y las secciones de prompts y fugas de esta bitácora. Además, la unidad asume Next.js en Vercel. La IA propuso dos caminos: (A) mantener Spring Boot en Render y agregar un front pequeño en Vercel, o (B) rehacer todo en Next.js.
+
+**Qué decidimos:** opción A.
+
+**Qué se hizo**
+- `docs/datos/modelo.md` §7: capa principal y capa de respaldo de cada regla.
+- `CLAUDE.md` con la arquitectura, las fuentes de verdad y la sección **Backend**.
+- Skill `.claude/skills/backend-seguro/SKILL.md`: checklist de seguridad en 8 grupos. La IA la escribió porque no teníamos una del curso.
+- Esta bitácora: secciones "Prompts clave" y "Fugas".
+- SPECS: el front en Vercel entra al alcance y CORS se limita a `CORS_ORIGINS` (F1).
+- Fugas F4 y F5 cerradas.
+
 ## Pendiente de revisar por nosotros
 
-- Confirmar con el profesor que se acepta Spring Boot en lugar de Next.js.
+- Confirmar con el profesor la arquitectura: Spring Boot en Render y un front pequeño en Vercel, en lugar de Next.js.
 - Validar el diagrama Mermaid en VS Code o GitHub.
