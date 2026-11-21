@@ -1,0 +1,19 @@
+# Blueprint de Render para el backend.
+# Los valores secretos NO van aquí: Render los pide al crear el servicio (sync: false).
+services:
+  - type: web
+    name: todos-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/todos
+    autoDeploy: true
+    envVars:
+      - key: DB_URL
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false

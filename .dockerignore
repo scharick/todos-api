@@ -1,0 +1,14 @@
+# Solo entran a la imagen .mvn, mvnw, pom.xml y src
+.env
+.env.*
+.git
+target
+frontend
+docs
+supabase
+.claude
+.github
+.vscode
+.idea
+*.md
+.mcp.json
