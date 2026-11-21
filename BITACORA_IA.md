@@ -174,6 +174,33 @@ Los otros 4 puntos (`id` y `created_at` en cada tabla, FK en las relaciones, `UN
 | F11 | `CORS_ORIGINS=*` mal configurado en Render | Volvería a abrir F1 | `CorsConfig` descarta `*` aunque esté configurado | Cerrada |
 | — | `spring-boot-devtools` en el `pom.xml` | Herramienta de desarrollo | Justificada: es `optional` y Spring Boot no la incluye en el `.jar` de producción | Justificada |
 
+## Lab 11 — Despliegue en Render y Vercel
+
+**Prompts:** "sube al repositorio" y "vamos a desplegarlo con Vercel".
+
+**Qué corrigió la IA del pedido:** Vercel no ejecuta Java, así que el backend no puede ir ahí. Se mantuvo el plan A: el backend Spring Boot en Render (Docker) y el front en Vercel.
+
+**Qué hizo la IA**
+- Antes del primer `push`, revisó todo el historial de git en busca de secretos: no había ninguno.
+- `Dockerfile` en dos etapas (la app no corre como root), `.dockerignore` (deja fuera `.env` y `.git`), `render.yaml` con los secretos marcados `sync: false`, `frontend/vercel.json` con cabeceras de seguridad y `scripts/prueba-de-fuego.sh`.
+- Comprobó que el `.jar` de producción no incluye `devtools` ni el `.env`.
+
+**URLs:** front https://todos-api-frontend.vercel.app · backend https://todos-api-hoal.onrender.com · repo https://github.com/scharick/todos-api
+
+**Resultados**
+- Primera corrida: 12 de 16 pruebas de fuego pasaron. Las 4 fallas eran porque `CORS_ORIGINS` en Render aún no tenía la URL de Vercel. Esto también prueba que CORS bloquea en producción.
+- Después de corregir `CORS_ORIGINS`: **16 de 16**.
+- Navegador simulado sobre la página de Vercel (crear, validar, toggle, filtro, editar, XSS, eliminar): todo pasa. La tabla quedó con sus 3 tareas.
+
+**Fugas**
+
+| ID | Fuga | Riesgo | Cómo se cerró | Estado |
+|----|------|--------|---------------|--------|
+| F12 | La CSP del front permitía conectarse a cualquier `*.onrender.com` | Un script inyectado podía enviar datos a otro servicio de Render | `connect-src` solo permite `https://todos-api-hoal.onrender.com` | Cerrada |
+| F13 | Contenedor como root (lo que trae por defecto la imagen base) | Si la app es vulnerada, el atacante tiene root en el contenedor | Usuario `app` sin privilegios en el `Dockerfile` | Cerrada |
+| — | El rechazo de CORS responde `403 Invalid CORS request` en texto plano, no en el formato JSON del contrato | Ninguno: no expone detalles internos | Justificada: lo responde Spring antes del controlador y solo lo ven orígenes no permitidos | Justificada |
+| — | Render gratis se duerme y la primera petición tarda ~1 min | Disponibilidad, no seguridad | Justificada: el front muestra "Cargando…"; es el plan gratuito | Justificada |
+
 ## Pendiente de revisar por nosotros
 
 - Confirmar con el profesor la arquitectura: Spring Boot en Render y un front pequeño en Vercel, en lugar de Next.js.

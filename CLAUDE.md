@@ -6,9 +6,11 @@ MVP académico: API REST de tareas (CRUD) con un front pequeño que la consume.
 
 | Parte | Tecnología | Dónde se despliega |
 |-------|-----------|--------------------|
-| Backend (este repo, raíz) | Spring Boot 4.1.1, Java 21, Maven | Render (Docker) |
+| Backend (este repo, raíz) | Spring Boot 4.1.1, Java 21, Maven | Render (Docker): https://todos-api-hoal.onrender.com |
 | Base de datos | PostgreSQL en Supabase | Supabase |
-| Front | Pequeño, consume la API | Vercel |
+| Front (`frontend/`) | HTML, CSS y JS | Vercel: https://todos-api-frontend.vercel.app |
+
+Después de desplegar, corre `bash scripts/prueba-de-fuego.sh <url-render> <url-vercel>`; todas deben pasar.
 
 ## Fuentes de verdad (léelas antes de cambiar algo)
 

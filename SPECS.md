@@ -169,10 +169,15 @@ spring.jpa.hibernate.ddl-auto=validate
 
 ## 9. Despliegue
 
-1. Crear un `Dockerfile` multi-etapa (compilar con Maven, ejecutar con JRE 21).
-2. Subir el proyecto a un repositorio de GitHub.
-3. En Render: *New → Web Service* → conectar el repo → entorno **Docker** → plan **Free**.
-4. Verificar con `GET https://<app>.onrender.com/api/todos`.
+| Parte | URL | Cómo se despliega |
+|-------|-----|-------------------|
+| Front | https://todos-api-frontend.vercel.app | Vercel, carpeta raíz `frontend/`, sin compilación (`frontend/vercel.json`) |
+| Backend | https://todos-api-hoal.onrender.com/api/todos | Render, Blueprint `render.yaml` con el `Dockerfile` |
+| Repositorio | https://github.com/scharick/todos-api | Cada `git push` a `main` vuelve a desplegar los dos |
+
+Variables en Render (nunca en el repo): `DB_URL`, `DB_USER`, `DB_PASSWORD` y `CORS_ORIGINS=https://todos-api-frontend.vercel.app,http://localhost:5173`.
+
+Pruebas de fuego: `bash scripts/prueba-de-fuego.sh https://todos-api-hoal.onrender.com https://todos-api-frontend.vercel.app`.
 
 > En el plan gratuito de Render el servicio "se duerme" tras un rato sin uso; la primera petición puede tardar ~30–60 s.
 
