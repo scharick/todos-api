@@ -27,7 +27,7 @@ El modelo tiene **una sola entidad** y, por tanto, **no hay relaciones** ni clav
 | `title`       | `VARCHAR(100)` | No   | —            | Se recorta (*trim*) antes de validar; 1–100 caracteres; se permiten repetidos (reglas 1, 2) |
 | `description` | `VARCHAR(500)` | Sí   | `NULL`       | Máx. 500 caracteres (regla 2) |
 | `completed`   | `BOOLEAN`      | No   | `false`      | Siempre `true` o `false` (regla 6) |
-| `created_at`  | `TIMESTAMPTZ` (en H2: `TIMESTAMP WITH TIME ZONE`) | No   | — (lo asigna la app al crear) | No se actualiza nunca; nunca es futura (reglas 4, 5) |
+| `created_at`  | `TIMESTAMPTZ`  | No   | — (lo asigna la app al crear) | No se actualiza nunca; nunca es futura (reglas 4, 5) |
 
 **Nombres en la BD y en la API:** en la base de datos las columnas usan `snake_case` (`created_at`) y en el JSON de la API usan `camelCase` (`createdAt`). Es el mismo dato con otro nombre.
 
@@ -77,4 +77,12 @@ Todos los puntos pasan después de las correcciones.
 
 - Entidad `USUARIOS` con relación 1:N hacia `TODOS` (un usuario tiene muchas tareas).
 - Columna `updated_at`.
-- Migrar de H2 a PostgreSQL para que los datos no se pierdan al reiniciar.
+
+## 6. Implementación en la base de datos
+
+El modelo está implementado en PostgreSQL de Supabase con la migración [supabase/migrations/20261120000000_crear_tabla_todos.sql](../../supabase/migrations/20261120000000_crear_tabla_todos.sql):
+
+- Reglas 1 y 2 → `NOT NULL`, `VARCHAR(100)`/`VARCHAR(500)` y los `CHECK` `todos_title_no_vacio`, `todos_title_recortado` y `todos_description_no_vacia`.
+- Reglas 3, 4 y 7 → `id` `GENERATED ALWAYS AS IDENTITY`: la BD rechaza un id enviado y cualquier cambio del id.
+- Reglas 4 y 5 → trigger `todos_proteger_created_at`: rechaza fechas futuras y cambios de `created_at`.
+- Dueño de la fila → RLS activado sin políticas y sin permisos para `anon` y `authenticated`. Solo el backend (dueño de la tabla) puede leer y escribir.

@@ -10,13 +10,13 @@ Construir un backend REST sencillo para gestionar una lista de tareas (CRUD) y d
 |-----------------|--------------------------------------------|
 | Lenguaje        | Java 21                                    |
 | Framework       | Spring Boot 4.1.1 (Spring Web MVC)         |
-| Persistencia    | Spring Data JPA + base de datos H2 (en memoria) |
+| Persistencia    | Spring Data JPA + PostgreSQL en Supabase   |
 | Validación      | Jakarta Bean Validation (`spring-boot-starter-validation`) |
 | Utilidades      | Lombok                                     |
 | Build           | Maven (wrapper `mvnw`)                     |
 | Despliegue      | Docker + Render (plan gratuito)            |
 
-> H2 en memoria hace que no haga falta instalar ni pagar una base de datos. Los datos se borran cada vez que el servidor se reinicia, lo cual es aceptable para este proyecto académico.
+> La base de datos es PostgreSQL en Supabase (plan gratuito): no hay que instalar nada y los datos se conservan cuando el servidor se reinicia. El esquema se crea con las migraciones de `supabase/migrations/`, no con Hibernate.
 
 ## 3. Modelo de datos
 
@@ -140,7 +140,7 @@ src/main/java/edu/usta/todos/
                   GlobalExceptionHandler.java (@RestControllerAdvice)
 ```
 
-Flujo: `Controller → Service → Repository → H2`.
+Flujo: `Controller → Service → Repository → PostgreSQL (Supabase)`.
 
 ## 7. Configuración
 
@@ -149,17 +149,21 @@ Flujo: `Controller → Service → Repository → H2`.
 ```properties
 spring.application.name=todos
 server.port=${PORT:8080}
-spring.datasource.url=jdbc:h2:mem:todosdb
-spring.jpa.hibernate.ddl-auto=update
-spring.h2.console.enabled=true
+spring.datasource.url=${DB_URL}
+spring.datasource.username=${DB_USER}
+spring.datasource.password=${DB_PASSWORD}
+spring.jpa.hibernate.ddl-auto=validate
 ```
 
-`server.port=${PORT:8080}` permite que Render asigne el puerto en producción y que localmente se use el 8080.
+- `server.port=${PORT:8080}` permite que Render asigne el puerto en producción y que localmente se use el 8080.
+- Los datos de conexión salen de variables de entorno (en Render y en el equipo local) y **nunca** se suben al repositorio.
+- `ddl-auto=validate`: Hibernate solo comprueba que las entidades coincidan con la tabla; no la crea ni la modifica, porque de eso se encargan las migraciones.
+- El backend se conecta como dueño de la tabla, por eso no le afecta RLS (ver [supabase/migrations/](supabase/migrations/)).
 
 ## 8. Requisitos no funcionales
 
 - **CORS** habilitado para cualquier origen, para que un frontend pueda consumir la API.
-- **Datos de ejemplo**: al arrancar se cargan 2–3 tareas para que la API no esté vacía en la demo.
+- **Datos de ejemplo**: 3 tareas cargadas una sola vez en la BD con [supabase/seed.sql](supabase/seed.sql). La app no carga datos al arrancar, para no duplicarlos.
 - **Pruebas**: al menos una prueba de controlador (`@WebMvcTest` o `MockMvc`) por endpoint principal.
 
 ## 9. Despliegue
@@ -181,7 +185,7 @@ spring.h2.console.enabled=true
 
 ## 11. Fuera de alcance
 
-Autenticación/usuarios, paginación, base de datos persistente (PostgreSQL) y frontend. Se pueden añadir después como mejoras.
+Autenticación/usuarios, paginación y frontend. Se pueden añadir después como mejoras.
 
 ## 12. Criterios de aceptación del back
 

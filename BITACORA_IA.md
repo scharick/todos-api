@@ -58,6 +58,35 @@ Los otros 4 puntos (`id` y `created_at` en cada tabla, FK en las relaciones, `UN
 - **Mensaje de error:** `El cuerpo de la petición no es un JSON válido` cambió a `El cuerpo de la petición no es válido`, porque también cubre los tipos incorrectos (ej. `"completed": "si"`).
 - **Duplicación:** la tabla de errores de SPECS §4 se reemplazó por un enlace al contrato, que quedó como fuente oficial.
 
+## Lab 6 — Conector MCP de Supabase
+
+**Qué nos dieron:** `claude mcp add --transport http supabase "https://supabase.com/dashboard/project/avinketmglmqzsaehzpt"`.
+
+**Qué corrigió la IA**
+- La URL era la del dashboard, no la del servidor MCP. Se cambió a `https://mcp.supabase.com/mcp?project_ref=avinketmglmqzsaehzpt`, limitada a un solo proyecto.
+- Para dar el mínimo permiso se agregó `read_only=true`. Lo quitamos nosotros a mano cuando aprobamos la migración.
+- El comando `claude` no estaba instalado (solo la extensión de VS Code), así que el conector se configuró en `.mcp.json`.
+
+## Lab 7 — Migración en Supabase
+
+**Qué propuso la IA**
+- Una migración ([supabase/migrations/20261120000000_crear_tabla_todos.sql](supabase/migrations/20261120000000_crear_tabla_todos.sql)) con la tabla `todos`, 3 `CHECK`, `id` `GENERATED ALWAYS`, un trigger que protege `created_at` y RLS activado.
+- RLS **sin políticas** y sin permisos para `anon` y `authenticated`, porque el dueño de las filas es la aplicación (el backend se conecta como dueño de la tabla).
+- Datos semilla con las 3 tareas del modelo ([supabase/seed.sql](supabase/seed.sql)).
+
+**Qué adaptamos o corregimos**
+- El prompt del profesor hablaba de canchas y reservas; se adaptó a nuestra única tabla `todos`. No hay FK ni `UNIQUE` extra porque no hay relaciones y se permiten títulos repetidos.
+- La skill `backend-seguro` no estaba instalada; se siguieron las reglas de seguridad de Supabase.
+- La IA no usó un `CHECK` con `now()` para la regla "nunca futura" (Postgres no lo recomienda) y lo hizo con un trigger con 1 minuto de tolerancia.
+- Leímos el SQL con el checklist del interventor y lo aprobamos sin cambios.
+
+**Resultados**
+- Los 5 intentos que violaban reglas fallaron: título vacío, título de 101 caracteres, `id` enviado por el cliente, fecha futura y cambio de `created_at`.
+- RLS activo en `todos`; `anon` y `authenticated` no pueden leer.
+- Advisor de seguridad: un solo aviso INFO, `rls_enabled_no_policy`. Es intencional (ver arriba).
+
+**Cambios derivados:** las specs y el modelo pasaron de H2 a PostgreSQL de Supabase. La conexión se configura con variables de entorno, `ddl-auto=validate`, y las tareas de ejemplo salen de `seed.sql` en lugar de cargarse al arrancar.
+
 ## Pendiente de revisar por nosotros
 
 - Confirmar con el profesor que se acepta Spring Boot en lugar de Next.js.
