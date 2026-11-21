@@ -87,6 +87,24 @@ Los otros 4 puntos (`id` y `created_at` en cada tabla, FK en las relaciones, `UN
 
 **Cambios derivados:** las specs y el modelo pasaron de H2 a PostgreSQL de Supabase. La conexión se configura con variables de entorno, `ddl-auto=validate`, y las tareas de ejemplo salen de `seed.sql` en lugar de cargarse al arrancar.
 
+## Lab 8 — Datos semilla y verificación
+
+**Datos semilla:** el prompt pedía "3 canchas y algunas reservas". Como nuestro MVP solo tiene la tabla `todos`, el equivalente son las 3 tareas que ya se cargaron en el Lab 7: 1 completada, 2 pendientes y 1 sin descripción, que alcanzan para probar el filtro y el `null`.
+
+**Qué propuso la IA:** como "doble reserva" usar la única regla "no puede haber dos" que tenemos, dos tareas con el mismo `id`. La prueba fuerza el `id` repetido con `OVERRIDING SYSTEM VALUE`, para comprobar la clave primaria y no solo `GENERATED ALWAYS`. Las consultas quedaron en [supabase/verificacion.sql](supabase/verificacion.sql).
+
+**Resultados**
+
+| Comprobación | Resultado |
+|--------------|-----------|
+| `id` repetido (la "doble reserva") | Falló: `23505 duplicate key ... "todos_pkey"` |
+| Estado de los datos | 3 tareas; 0 títulos inválidos, 0 fechas futuras, 0 ids repetidos |
+| Restricciones activas | `todos_pkey` y los 3 `CHECK` de la migración |
+| Lectura con la llave pública (`anon`) | Falló: `42501 permission denied for table todos` |
+| Advisor de seguridad | Solo `rls_enabled_no_policy` (INFO), intencional; ningún WARN ni ERROR |
+
+**Qué corregimos:** nada; los resultados coinciden con lo esperado.
+
 ## Pendiente de revisar por nosotros
 
 - Confirmar con el profesor que se acepta Spring Boot en lugar de Next.js.
