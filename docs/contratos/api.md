@@ -237,7 +237,7 @@ Reemplazo completo: los campos que no se envían toman su valor por defecto (`de
 | `404` | No existe una tarea con ese id | `Todo con id {id} no existe` |
 | `500` | Error inesperado | `Error interno del servidor` |
 
-Orden de las comprobaciones: primero el id (`400`), luego que exista (`404`) y al final el cuerpo (`400`). Si hay un `400`, la tarea queda como estaba (regla 8).
+Orden de las comprobaciones: primero el id (`400`), luego el cuerpo (`400`) y al final que la tarea exista (`404`). Si hay un `400`, la tarea queda como estaba (regla 8).
 
 ---
 
