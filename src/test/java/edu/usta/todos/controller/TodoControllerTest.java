@@ -11,6 +11,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
@@ -30,21 +31,30 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import edu.usta.todos.config.SecurityConfig;
 import edu.usta.todos.dto.TodoRequest;
 import edu.usta.todos.dto.TodoResponse;
 import edu.usta.todos.exception.TodoNotFoundException;
 import edu.usta.todos.service.TodoService;
 
-/** Criterios de aceptación del back (SPECS §12) en la capa API. */
-@WebMvcTest(TodoController.class)
-@TestPropertySource(properties = "app.cors.origins=https://todos-front.vercel.app")
+/** Criterios de aceptación del back (SPECS §12) en la capa API, con Spring Security activo. */
+@WebMvcTest(controllers = { TodoController.class, AuthController.class, ErrorPageController.class })
+@Import(SecurityConfig.class)
+@TestPropertySource(properties = {
+        "app.cors.origins=https://todos-front.vercel.app",
+        "app.security.user=" + TodoControllerTest.USUARIO,
+        "app.security.password=" + TodoControllerTest.PASSWORD })
 class TodoControllerTest {
+
+    static final String USUARIO = "admin";
+    static final String PASSWORD = "clave-de-prueba-123";
 
     private static final OffsetDateTime FECHA = OffsetDateTime.of(2026, 11, 20, 10, 30, 0, 0, ZoneOffset.ofHours(-5));
     private static final TodoResponse TAREA_1 = new TodoResponse(1L, "Estudiar Spring Boot", "Repasar controladores y JPA", false, FECHA);
@@ -57,8 +67,78 @@ class TodoControllerTest {
     @MockitoBean
     TodoService service;
 
+    /** Petición con usuario y contraseña correctos. */
+    private static MockHttpServletRequestBuilder conLogin(MockHttpServletRequestBuilder request) {
+        return request.with(httpBasic(USUARIO, PASSWORD));
+    }
+
+    /** Petición con cuerpo JSON y login (todas las escrituras lo exigen). */
     private static MockHttpServletRequestBuilder json(MockHttpServletRequestBuilder request, String body) {
-        return request.contentType(MediaType.APPLICATION_JSON).content(body);
+        return conLogin(request.contentType(MediaType.APPLICATION_JSON).content(body));
+    }
+
+    // ---------- Seguridad ----------
+
+    @Test
+    void leer_no_exige_login() throws Exception {
+        when(service.get(1L)).thenReturn(TAREA_1);
+
+        mvc.perform(get("/api/todos/1")).andExpect(status().isOk());
+    }
+
+    @Test
+    void crear_sin_login_responde_401_sin_ventana_del_navegador() throws Exception {
+        mvc.perform(post("/api/todos").contentType(MediaType.APPLICATION_JSON).content("{\"title\": \"X\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.message").value("Debes iniciar sesión para hacer esto"))
+                .andExpect(header().doesNotExist("WWW-Authenticate"));
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void contrasena_incorrecta_responde_401() throws Exception {
+        mvc.perform(delete("/api/todos/1").with(httpBasic(USUARIO, "otra-clave-incorrecta")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Usuario o contraseña incorrectos"));
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void editar_marcar_y_eliminar_sin_login_responden_401() throws Exception {
+        mvc.perform(put("/api/todos/1").contentType(MediaType.APPLICATION_JSON).content("{\"title\": \"X\"}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(patch("/api/todos/1/toggle")).andExpect(status().isUnauthorized());
+        mvc.perform(delete("/api/todos/1")).andExpect(status().isUnauthorized());
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void ca_7_1_me_con_login_devuelve_el_usuario() throws Exception {
+        mvc.perform(conLogin(get("/api/auth/me")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value(USUARIO));
+    }
+
+    @Test
+    void ca_7_2_me_sin_login_responde_401() throws Exception {
+        mvc.perform(get("/api/auth/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Debes iniciar sesión para hacer esto"));
+    }
+
+    @Test
+    void ruta_fuera_del_contrato_exige_login() throws Exception {
+        mvc.perform(get("/api/otra-cosa")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void respuestas_traen_cabeceras_de_seguridad() throws Exception {
+        when(service.list(null)).thenReturn(List.of());
+
+        mvc.perform(get("/api/todos"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andExpect(header().string("X-Frame-Options", "DENY"));
     }
 
     // ---------- Op. 1 ----------
@@ -268,7 +348,7 @@ class TodoControllerTest {
     void ca_5_1_marca_como_completada() throws Exception {
         when(service.toggle(1L)).thenReturn(new TodoResponse(1L, "Estudiar Spring Boot", null, true, FECHA));
 
-        mvc.perform(patch("/api/todos/1/toggle"))
+        mvc.perform(conLogin(patch("/api/todos/1/toggle")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.completed").value(true));
     }
@@ -277,7 +357,7 @@ class TodoControllerTest {
     void ca_5_3_error_toggle_tarea_inexistente() throws Exception {
         when(service.toggle(99L)).thenThrow(new TodoNotFoundException(99));
 
-        mvc.perform(patch("/api/todos/99/toggle"))
+        mvc.perform(conLogin(patch("/api/todos/99/toggle")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Todo con id 99 no existe"));
     }
@@ -286,7 +366,7 @@ class TodoControllerTest {
 
     @Test
     void ca_6_1_elimina_una_tarea() throws Exception {
-        mvc.perform(delete("/api/todos/3"))
+        mvc.perform(conLogin(delete("/api/todos/3")))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""));
         verify(service).delete(3L);
@@ -296,14 +376,14 @@ class TodoControllerTest {
     void ca_6_2_error_eliminar_dos_veces() throws Exception {
         doThrow(new TodoNotFoundException(3)).when(service).delete(3L);
 
-        mvc.perform(delete("/api/todos/3"))
+        mvc.perform(conLogin(delete("/api/todos/3")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Todo con id 3 no existe"));
     }
 
     @Test
     void ca_6_3_error_eliminar_id_no_numerico() throws Exception {
-        mvc.perform(delete("/api/todos/abc"))
+        mvc.perform(conLogin(delete("/api/todos/abc")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("El id debe ser un número"));
     }
@@ -324,15 +404,24 @@ class TodoControllerTest {
     }
 
     @Test
+    void pagina_de_error_usa_el_formato_del_contrato_sin_ruta() throws Exception {
+        mvc.perform(get("/error").requestAttr(jakarta.servlet.RequestDispatcher.ERROR_STATUS_CODE, 400))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("La petición no es válida"))
+                .andExpect(jsonPath("$.path").doesNotExist());
+    }
+
+    @Test
     void ruta_inexistente_responde_con_formato_del_contrato() throws Exception {
-        mvc.perform(get("/api/otra-cosa"))
+        mvc.perform(conLogin(get("/api/otra-cosa")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Recurso no encontrado"));
     }
 
     @Test
     void metodo_no_soportado_responde_405() throws Exception {
-        mvc.perform(post("/api/todos/1"))
+        mvc.perform(conLogin(post("/api/todos/1")))
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(jsonPath("$.message").value("Método no permitido"));
     }
